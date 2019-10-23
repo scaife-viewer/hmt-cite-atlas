@@ -5,12 +5,23 @@ from .models import Library, Line, Version
 
 @admin.register(Library)
 class LibraryAdmin(admin.ModelAdmin):
-    list_display = ("id", "urn", "name", "namespaces", "metadata")
+    list_display = ("id", "urn", "name", "metadata")
 
 
 @admin.register(Version)
 class VersionAdmin(admin.ModelAdmin):
-    list_display = ("id", "urn", "name", "library")
+    list_display = (
+        "id",
+        "urn",
+        "work_title",
+        "group_name",
+        "citation_scheme",
+        "version_label",
+        "exemplar_label",
+        "online",
+        "lang",
+        "library",
+    )
     list_filter = ("library",)
 
 

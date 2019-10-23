@@ -7,9 +7,8 @@ class Library(models.Model):
     urn:cite2:hmt:publications.cex.2018e:all
     """
 
-    urn = models.CharField(max_length=255)
+    urn = models.CharField(max_length=255, unique=True)
     name = models.CharField(blank=True, null=True, max_length=255)
-    namespaces = JSONField(encoder="", default=dict, blank=True)
 
     metadata = JSONField(encoder="", default=dict, blank=True)
     """
@@ -17,7 +16,8 @@ class Library(models.Model):
         "library_urn": "",
         "library_title": "",
         "licence": "",
-        "type": "library"
+        "type": "library",
+        "namespaces": ""
     }
     """
 
@@ -31,10 +31,17 @@ class Library(models.Model):
 
 class Version(models.Model):
     """
+    urn:cts:greekLit:tlg5026.msAext.va_dipl
     """
 
-    urn = models.CharField(max_length=255)
-    name = models.CharField(blank=True, null=True, max_length=255)
+    urn = models.CharField(max_length=255, unique=True)
+    citation_scheme = JSONField(encoder="", default=list, blank=True)
+    group_name = models.CharField(blank=True, null=True, max_length=255)
+    work_title = models.CharField(blank=True, null=True, max_length=255)
+    version_label = models.CharField(blank=True, null=True, max_length=255)
+    exemplar_label = models.CharField(blank=True, null=True, max_length=255)
+    online = models.BooleanField(blank=True, null=True)
+    lang = models.CharField(blank=True, null=True, max_length=255)
 
     library = models.ForeignKey(
         "library.Library", related_name="versions", on_delete=models.CASCADE
@@ -43,15 +50,20 @@ class Version(models.Model):
     class Meta:
         ordering = ["urn"]
 
+    @property
+    def label(self):
+        return f"{self.group_name}: {self.work_title}"
+
     def __str__(self):
-        return self.name
+        return f"{self.group_name}: {self.work_title}"
 
 
 class Line(models.Model):
     """
+    urn:cts:greekLit:tlg5026.msAext.va_dipl:1.135.comment
     """
 
-    urn = models.CharField(max_length=255)
+    urn = models.CharField(max_length=255, unique=True)
     text_content = models.TextField()
 
     position = models.IntegerField()

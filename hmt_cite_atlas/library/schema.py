@@ -8,7 +8,6 @@ from .models import Library, Line, Version
 
 class LibraryNode(DjangoObjectType):
     metadata = generic.GenericScalar()
-
     versions = DjangoFilterConnectionField(lambda: VersionNode)
     lines = DjangoFilterConnectionField(lambda: LineNode)
 
@@ -19,14 +18,23 @@ class LibraryNode(DjangoObjectType):
 
 
 class VersionNode(DjangoObjectType):
-    metadata = generic.GenericScalar()
-
+    label = String()
     lines = DjangoFilterConnectionField(lambda: LineNode)
 
     class Meta:
         model = Version
         interfaces = (relay.Node,)
-        filter_fields = ["name", "urn", "library__urn"]
+        filter_fields = [
+            "urn",
+            # "citation_scheme",  # TODO: Is a JSONField, punt for now.
+            "group_name",
+            "work_title",
+            "version_label",
+            "exemplar_label",
+            "online",
+            "lang",
+            "library__urn",
+        ]
 
 
 class LineNode(DjangoObjectType):

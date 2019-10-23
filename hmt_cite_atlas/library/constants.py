@@ -11,6 +11,6 @@ BLOCKS = {
     "#!datamodels",
 }
 
-COMMENTS = "//"
+COMMENT = "//"
 
 DELIMITER = "#"

@@ -42,9 +42,71 @@ Create a superuser:
 Run the `import_versions` script:
 
 ```
-./manage.py shell -c 'from hmt_cite_atlas.library.importers import import_versions; import_versions();'
+./manage.py shell -c 'from hmt_cite_atlas.library.importers import import_libraries; import_libraries()
 ```
 
 ## Sample Queries
 
 Access the interactive GraphQL explorer at `http://localhost:8000/graphql/`.
+
+Get all libraries and the URNs of the versions they contain.
+```
+{
+  libraries {
+    edges {
+      node {
+        id
+        urn
+        versions {
+          edges {
+            node {
+              urn
+            }
+          }
+        }
+      }
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}
+```
+
+Get the first line of every version in the library.
+```
+{
+  lines(position: 1) {
+    edges {
+      node {
+        urn
+        textContent
+      }
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}
+```
+
+Page through the Iliad ten lines at a time.
+```
+{
+  lines(version_Urn: "urn:cts:greekLit:tlg0012.tlg001.msA", first:10) {
+    edges {
+      cursor
+      node {
+        urn
+        textContent
+      }
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}
+```

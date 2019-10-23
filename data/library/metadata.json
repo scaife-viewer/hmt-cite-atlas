@@ -7,7 +7,11 @@
         "library_urn": "urn:cite2:hmt:publications.cex.2018e:all",
         "library_title": "Homer Multitext project, release 2018 E",
         "licence": "Creative Commons Attribution, Non-Commercial 4.0 License <https://creativecommons.org/licenses/by-nc/4.0/>",
-        "type": "library"
+        "type": "library",
+        "namespaces": {
+            "hmt": "http://www.homermultitext.org/citens/hmt",
+            "greekLit": "http://chs.harvard.edu/ctsns/greekLit"
+        }
       }
     }
   ]
