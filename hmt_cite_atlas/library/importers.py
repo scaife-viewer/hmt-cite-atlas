@@ -59,9 +59,9 @@ class Importer:
     def is_column_data(self, line):
         return self.parse_fields(line) in self.fields.values()
 
-    def yield_lines(self):
-        with open(self.full_content_path, "r", encoding="utf-8") as handle:
-            for line in handle:
+    def yield_data(self):
+        with open(self.full_content_path, "r", encoding="utf-8") as f:
+            for line in f:
                 line = line.strip()
 
                 if not line or self.is_comment(line):
@@ -85,14 +85,14 @@ class Importer:
 
                 if self.current_block == "#!ctscatalog":
                     if not self.is_column_data(line):
-                        yield None, None, line
+                        yield {"line": line}
 
                 if self.current_block == "#!ctsdata":
                     line_ref += 1
                     line_idx = line_ref - 1
-                    yield line_idx, line_ref, line
+                    yield {"line_idx": line_idx, "line_ref": line_ref, "line": line}
 
-    def handle_version(self, line):
+    def handle_version(self, line, **data):
         values = [x if x else None for x in self.split_line(line)]
         version_kwargs = {
             "library": self.library_obj,
@@ -114,7 +114,7 @@ class Importer:
             version_obj = self.factory_lookup["version"].get(**version_kwargs)
             self.model_lookup["version"][version_ref] = version_obj
 
-    def handle_line(self, line_idx, line_ref, line):
+    def handle_line(self, line_idx, line_ref, line, **data):
         urn, tokens = self.split_line(line)
         version_ref = self.get_version_urn(urn)
         version_obj = self.model_lookup["version"][version_ref]
@@ -128,12 +128,27 @@ class Importer:
         }
         self.to_create.append(Line(**line_kwargs))
 
+    @property
+    def handle(self):
+        return {
+            "#!cexversion": None,
+            "#!citelibrary": None,
+            "#!ctsdata": self.handle_line,
+            "#!ctscatalog": self.handle_version,
+            "#!citecollections": None,
+            "#!citeproperties": None,
+            "#!citedata": None,
+            "#!imagedata": None,
+            "#!relations": None,
+            "#!datamodels": None,
+        }[self.current_block]
+
     def apply(self):
-        for line_idx, line_ref, line in self.yield_lines():
-            if self.current_block == "#!ctscatalog":
-                self.handle_version(line)
-            elif self.current_block == "#!ctsdata":
-                self.handle_line(line_idx, line_ref, line)
+        for data in self.yield_data():
+            try:
+                self.handle(**data)
+            except TypeError:
+                raise NotImplementedError(self.current_block)
         return self.to_create
 
 
