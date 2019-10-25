@@ -1,15 +1,15 @@
 from django.contrib import admin
 
-from .models import Library, Line, Version
+from .models import CITELibrary, CTSCatalog, CTSDatum
 
 
-@admin.register(Library)
-class LibraryAdmin(admin.ModelAdmin):
+@admin.register(CITELibrary)
+class CTSLibraryAdmin(admin.ModelAdmin):
     list_display = ("id", "urn", "name", "metadata")
 
 
-@admin.register(Version)
-class VersionAdmin(admin.ModelAdmin):
+@admin.register(CTSCatalog)
+class CTSCatalogAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "urn",
@@ -20,20 +20,20 @@ class VersionAdmin(admin.ModelAdmin):
         "exemplar_label",
         "online",
         "lang",
-        "library",
+        "citelibrary",
     )
-    list_filter = ("library",)
+    list_filter = ("citelibrary",)
 
 
-@admin.register(Line)
-class LineAdmin(admin.ModelAdmin):
+@admin.register(CTSDatum)
+class CTSDatumAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "urn",
         "text_content",
         "position",
         "idx",
-        "version",
-        "library",
+        "ctscatalog",
+        "citelibrary",
     )
-    list_filter = ("version", "library")
+    list_filter = ("ctscatalog", "citelibrary")

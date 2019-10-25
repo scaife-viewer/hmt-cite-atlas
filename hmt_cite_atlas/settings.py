@@ -135,6 +135,9 @@ INSTALLED_APPS = [
     "hmt_cite_atlas.library",
 ]
 
+if DEBUG:
+    INSTALLED_APPS += ["django_extensions"]
+
 ADMIN_URL = "admin:index"
 CONTACT_EMAIL = "support@example.com"
 

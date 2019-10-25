@@ -3,26 +3,26 @@ from graphene.types import generic
 from graphene_django import DjangoObjectType
 from graphene_django.filter import DjangoFilterConnectionField
 
-from .models import Library, Line, Version
+from .models import CITELibrary, CTSCatalog, CTSDatum
 
 
-class LibraryNode(DjangoObjectType):
+class CITELibraryNode(DjangoObjectType):
     metadata = generic.GenericScalar()
-    versions = DjangoFilterConnectionField(lambda: VersionNode)
-    lines = DjangoFilterConnectionField(lambda: LineNode)
+    ctscatalogs = DjangoFilterConnectionField(lambda: CTSCatalogNode)
+    ctsdata = DjangoFilterConnectionField(lambda: CTSDatumNode)
 
     class Meta:
-        model = Library
+        model = CITELibrary
         interfaces = (relay.Node,)
         filter_fields = ["name", "urn"]
 
 
-class VersionNode(DjangoObjectType):
+class CTSCatalogNode(DjangoObjectType):
     label = String()
-    lines = DjangoFilterConnectionField(lambda: LineNode)
+    ctsdata = DjangoFilterConnectionField(lambda: CTSDatumNode)
 
     class Meta:
-        model = Version
+        model = CTSCatalog
         interfaces = (relay.Node,)
         filter_fields = [
             "urn",
@@ -37,11 +37,11 @@ class VersionNode(DjangoObjectType):
         ]
 
 
-class LineNode(DjangoObjectType):
+class CTSDatumNode(DjangoObjectType):
     label = String()
 
     class Meta:
-        model = Line
+        model = CTSDatum
         interfaces = (relay.Node,)
         filter_fields = [
             "text_content",
@@ -53,11 +53,11 @@ class LineNode(DjangoObjectType):
 
 
 class Query(ObjectType):
-    library = relay.Node.Field(LibraryNode)
-    libraries = DjangoFilterConnectionField(LibraryNode)
+    citelibrary = relay.Node.Field(CITELibraryNode)
+    citelibraries = DjangoFilterConnectionField(CITELibraryNode)
 
-    version = relay.Node.Field(VersionNode)
-    versions = DjangoFilterConnectionField(VersionNode)
+    ctscatalog = relay.Node.Field(CTSCatalogNode)
+    ctscatalogs = DjangoFilterConnectionField(CTSCatalogNode)
 
-    line = relay.Node.Field(LineNode)
-    lines = DjangoFilterConnectionField(LineNode)
+    ctsdatum = relay.Node.Field(CTSDatumNode)
+    ctsdata = DjangoFilterConnectionField(CTSDatumNode)
