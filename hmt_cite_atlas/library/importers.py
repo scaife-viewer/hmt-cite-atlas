@@ -53,11 +53,15 @@ class Importer:
     def block_has_columns(self):
         return self.current_block != "#!ctsdata"
 
-    def parse_fields(self, line):
-        return [stringcase.snakecase(x) for x in self.split_line(line)]
-
     def is_column_data(self, line):
-        return self.parse_fields(line) in self.fields.values()
+        return self.split_line(line) in self.fields.values()
+
+    def transform_fields(self, fields):
+        return [stringcase.snakecase(field) for field in fields]
+
+    def get_fields(self, urn=None):
+        key = urn if urn else self.current_block
+        return self.transform_fields(self.fields[key])
 
     def yield_data(self):
         with open(self.full_content_path, "r", encoding="utf-8") as f:
@@ -79,8 +83,7 @@ class Importer:
 
                 if not block_tag and self.block_has_columns():
                     if not self.fields.get(self.current_block):
-                        fields = self.parse_fields(line)
-                        self.fields[self.current_block] = fields
+                        self.fields[self.current_block] = self.split_line(line)
                         continue
 
                 if self.current_block == "#!ctscatalog":
@@ -93,10 +96,11 @@ class Importer:
                     yield {"line_idx": line_idx, "line_ref": line_ref, "line": line}
 
     def handle_version(self, line, **data):
+        fields = self.get_fields()
         values = [x if x else None for x in self.split_line(line)]
         version_kwargs = {
             "library": self.library_obj,
-            **dict(zip(self.fields["#!ctscatalog"], values)),
+            **dict(zip(fields, values)),
         }
 
         # TODO: Stripping the trailing ":" on the URN but I think that needs to
