@@ -24,7 +24,8 @@ class CITELibrary(models.Model):
 
     class Meta:
         ordering = ["urn"]
-        verbose_name_plural = "citelibraries"
+        verbose_name = "CITELibrary"
+        verbose_name_plural = "CITElibraries"
 
     def __str__(self):
         return self.name
@@ -44,6 +45,8 @@ class CITECollection(models.Model):
     )
 
     class Meta:
+        verbose_name = "CITECollection"
+        verbose_name_plural = "CITECollections"
         ordering = ["urn"]
 
     def __str__(self):
@@ -113,8 +116,9 @@ class CITEProperty(models.Model):
     )
 
     class Meta:
+        verbose_name = "CITEProperty"
+        verbose_name_plural = "CITEProperties"
         ordering = ["urn"]
-        verbose_name_plural = "citeproperties"
 
     def __str__(self):
         return self.urn
@@ -136,8 +140,9 @@ class CITEDatum(models.Model):
     )
 
     class Meta:
+        verbose_name = "CITEDatum"
+        verbose_name_plural = "CITEData"
         ordering = ["urn"]
-        verbose_name_plural = "citedata"
 
     def __str__(self):
         if self.labelling_property:
@@ -184,6 +189,8 @@ class CTSCatalog(models.Model):
     )
 
     class Meta:
+        verbose_name = "CITECatalog"
+        verbose_name_plural = "CITECatalogs"
         ordering = ["urn"]
 
     @property
@@ -213,8 +220,9 @@ class CTSDatum(models.Model):
     )
 
     class Meta:
+        verbose_name = "CTSDatum"
+        verbose_name_plural = "CTSData"
         ordering = ["idx"]
-        verbose_name_plural = "ctsdata"
 
     @property
     def label(self):

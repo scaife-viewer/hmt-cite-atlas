@@ -39,10 +39,10 @@ Create a superuser:
 ./manage.py createsuperuser
 ```
 
-Run the `import_versions` script:
+Run the `import_libraries` script:
 
 ```
-./manage.py shell -c 'from hmt_cite_atlas.library.importers import import_libraries; import_libraries()
+./manage.py shell -c 'from hmt_cite_atlas.library.importers import import_libraries; import_libraries()'
 ```
 
 ## Sample Queries

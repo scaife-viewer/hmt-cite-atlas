@@ -1,11 +1,51 @@
 from django.contrib import admin
 
-from .models import CITELibrary, CTSCatalog, CTSDatum
+from .models import (
+    CITECollection,
+    CITEDatum,
+    CITELibrary,
+    CITEProperty,
+    CTSCatalog,
+    CTSDatum,
+    Datamodel,
+)
 
 
 @admin.register(CITELibrary)
-class CTSLibraryAdmin(admin.ModelAdmin):
+class CITELibraryAdmin(admin.ModelAdmin):
     list_display = ("id", "urn", "name", "metadata")
+
+
+@admin.register(CITECollection)
+class CITECollectionAdmin(admin.ModelAdmin):
+    list_display = ("id", "urn", "description", "license")
+    list_filter = ("citelibrary",)
+
+
+@admin.register(Datamodel)
+class DatamodelAdmin(admin.ModelAdmin):
+    list_display = ("id", "urn", "label", "description")
+    list_filter = ("citecollection", "citelibrary")
+
+
+@admin.register(CITEProperty)
+class CITEPropertyAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "urn",
+        "label",
+        "property_type",
+        "authority_list",
+        "labelling_property",
+        "ordering_property",
+    )
+    list_filter = ("citecollection", "citelibrary")
+
+
+@admin.register(CITEDatum)
+class CITEDatumAdmin(admin.ModelAdmin):
+    list_display = ("id", "urn", "fields")
+    list_filter = ("citecollection", "citelibrary")
 
 
 @admin.register(CTSCatalog)

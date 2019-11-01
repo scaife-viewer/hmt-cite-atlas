@@ -28,7 +28,7 @@ class Visitor:
             "#!imagedata": None,
             "#!relations": None,
         }
-        self.count = 0
+        self.visited = 0
 
     @staticmethod
     def is_urn(value):
@@ -57,7 +57,7 @@ class Visitor:
                 obj_kwargs[key] = resolved
 
         instance = self.factory_lookup[block].get(**obj_kwargs)
-        self.count += 1
+        self.visited += 1
         self.index[urn] = instance
         return instance
 
@@ -66,7 +66,7 @@ class Visitor:
             if isinstance(data, tuple):
                 block, obj_kwargs = data
                 self.resolve_node(urn, block, obj_kwargs)
-        return self.count
+        return self.visited
 
 
 class Parser:
@@ -96,7 +96,7 @@ class Parser:
         return case_conversion.snakecase(column)
 
     @staticmethod
-    def get_collection_urn(urn, delimiter=":"):
+    def get_urn_root(urn, delimiter=":"):
         return f"{urn.rsplit(delimiter, maxsplit=1)[0]}:"
 
     def ignore_block(self):
@@ -178,7 +178,7 @@ class Parser:
             "text_content": tokens,
             "position": line_ref,
             "idx": line_idx,
-            "ctscatalog": self.get_collection_urn(urn),
+            "ctscatalog": self.get_urn_root(urn),
             "citelibrary": self.library_obj,
         }
         self.index_obj(obj_kwargs)
@@ -230,9 +230,9 @@ class Parser:
     def handle_citedata(self, line, **data):
         urns = [item for item in self.split_line(line) if "urn:" in item]
         collection_urn = next(
-            self.get_collection_urn(urn)
+            self.get_urn_root(urn)
             for urn in urns
-            if self.get_collection_urn(urn) in self.columns
+            if self.get_urn_root(urn) in self.columns
         )
         urn = next(urn for urn in urns if collection_urn in urn)
         obj_kwargs = self.destructure_line(line, urn=collection_urn)
@@ -289,8 +289,8 @@ def _import_library(data):
     )
 
     index = Parser(full_content_path, library_obj).apply()
-    count = Visitor(index).apply()
-    print(f"Created {count} objects.", file=sys.stderr)
+    visited = Visitor(index).apply()
+    print(f"Created {visited} objects.", file=sys.stderr)
 
 
 def import_libraries(reset=True):
