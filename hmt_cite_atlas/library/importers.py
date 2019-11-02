@@ -75,7 +75,7 @@ class Parser:
         self.library_obj = library_obj
         self.current_block = None
         self.dynamic_columns = {}
-        self.merge_to_row = {}
+        self.property_flags = {}
         self.columns = {}
         self.index = {}
 
@@ -186,7 +186,7 @@ class Parser:
     def handle_citecollections(self, line, **data):
         obj_kwargs = self.destructure_line(line)
         urn = obj_kwargs["urn"]
-        self.merge_to_row[urn] = {
+        self.property_flags[urn] = {
             "labelling_property": obj_kwargs.pop("labelling_property"),
             "ordering_property": obj_kwargs.pop("ordering_property"),
         }
@@ -212,9 +212,9 @@ class Parser:
                 {"authority_list": obj_kwargs["authority_list"].split(",")}
             )
 
-        values_to_merge = {
+        property_flags = {
             key: (value == urn)
-            for key, value in self.merge_to_row.get(collection_urn, {}).items()
+            for key, value in self.property_flags.get(collection_urn, {}).items()
         }
 
         obj_kwargs.update(
@@ -222,7 +222,7 @@ class Parser:
                 "urn": urn,
                 "property_type": obj_kwargs.pop("type"),
                 "citecollection": collection_urn,
-                **values_to_merge,
+                **property_flags,
             }
         )
         self.index_obj(obj_kwargs)

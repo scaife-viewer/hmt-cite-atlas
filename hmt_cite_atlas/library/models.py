@@ -56,6 +56,16 @@ class CITECollection(models.Model):
     def ordered_collection(self):
         return self.citeproperties.filter(ordering_property=True).exists()
 
+    @property
+    def labelling_property(self):
+        qs = self.citeproperties.filter(labelling_property=True)
+        return qs.first() if qs.exists() else None
+
+    @property
+    def ordering_property(self):
+        qs = self.citeproperties.filter(ordering_property=True)
+        return qs.first() if qs.exists() else None
+
 
 class Datamodel(models.Model):
     """
@@ -101,8 +111,6 @@ class CITEProperty(models.Model):
     label = models.CharField(max_length=255, blank=True, null=True)
     property_type = models.CharField(max_length=8, choices=PROPERTY_TYPE_CHOICES)
     authority_list = JSONField(encoder="", default=list, blank=True, null=True)
-    # TODO: These should always be unique per the data but it might be worth
-    # enforcing some kind of key on them... Needs to be done in `save`.
     labelling_property = models.BooleanField()
     ordering_property = models.BooleanField()
 
@@ -145,9 +153,11 @@ class CITEDatum(models.Model):
         ordering = ["urn"]
 
     def __str__(self):
-        if self.labelling_property:
-            return self.fields[self.labelling_property.urn]
         return self.urn
+
+    @property
+    def label(self):
+        return self.fields.get(self.label_by) or self.urn
 
     @property
     def schema(self):
@@ -160,14 +170,10 @@ class CITEDatum(models.Model):
         ).order_by("pk")
 
     @property
-    def labelling_property(self):
-        qs = self.citeproperties.filter(labelling_property=True)
-        return qs.first() if qs.exists() else None
-
-    @property
-    def ordering_property(self):
-        qs = self.citeproperties.filter(ordering_property=True)
-        return qs.first() if qs.exists() else None
+    def label_by(self):
+        if self.citecollection.labelling_property:
+            return self.citecollection.labelling_property.urn
+        return None
 
 
 class CTSCatalog(models.Model):
@@ -193,12 +199,8 @@ class CTSCatalog(models.Model):
         verbose_name_plural = "CITECatalogs"
         ordering = ["urn"]
 
-    @property
-    def label(self):
-        return f"{self.group_name}: {self.work_title}"
-
     def __str__(self):
-        return f"{self.group_name}: {self.work_title}"
+        return self.urn
 
 
 class CTSDatum(models.Model):
@@ -229,4 +231,4 @@ class CTSDatum(models.Model):
         return f"{self.position}"
 
     def __str__(self):
-        return f"{self.version} [line={self.position}]"
+        return f"{self.citelibrary} {self.citecatalog} [line={self.position}]"
