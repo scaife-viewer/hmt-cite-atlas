@@ -11,6 +11,7 @@ from .models import (
     CTSCatalog,
     CTSDatum,
     Datamodel,
+    Relation
 )
 
 
@@ -89,8 +90,15 @@ class CTSDatumNode(DjangoObjectType):
             "postition",
             "index",
             "ctscatalog__urn",
-            "citelibrary__urn"
+            "citelibrary__urn",
         ]
+
+
+class RelationNode(DjangoObjectType):
+    class Meta:
+        model = Relation
+        interfaces = (relay.Node,)
+        filter_fields = ["urn", "citelibrary__urn"]
 
 
 class Query(ObjectType):
@@ -114,3 +122,6 @@ class Query(ObjectType):
 
     ctsdatum = relay.Node.Field(CTSDatumNode)
     ctsdata = DjangoFilterConnectionField(CTSDatumNode)
+
+    relation = relay.Node.Field(RelationNode)
+    relations = relay.Node.Field(RelationNode)

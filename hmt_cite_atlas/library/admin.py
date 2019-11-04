@@ -7,7 +7,7 @@ from .models import (
     CITEProperty,
     CTSCatalog,
     CTSDatum,
-    Datamodel,
+    Datamodel
 )
 
 

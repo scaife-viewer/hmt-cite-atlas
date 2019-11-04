@@ -1,5 +1,28 @@
+from django.contrib.contenttypes.fields import (
+    GenericForeignKey,
+    GenericRelation
+)
+from django.contrib.contenttypes.models import ContentType
 from django.contrib.postgres.fields import JSONField
 from django.db import models
+
+
+class GenericRelationMixin(models.Model):
+    subject_relations = GenericRelation(
+        "library.Relation",
+        content_type_field="subject_content_type",
+        object_id_field="subject_id",
+        related_query_name="subject_obj",
+    )
+    object_relations = GenericRelation(
+        "library.Relation",
+        content_type_field="object_content_type",
+        object_id_field="object_id",
+        related_query_name="object_obj",
+    )
+
+    class Meta:
+        abstract = True
 
 
 class CITELibrary(models.Model):
@@ -132,7 +155,7 @@ class CITEProperty(models.Model):
         return self.urn
 
 
-class CITEDatum(models.Model):
+class CITEDatum(GenericRelationMixin):
     """
     urn:cite2:hmt:msA.v1.sequence:
     """
@@ -195,15 +218,15 @@ class CTSCatalog(models.Model):
     )
 
     class Meta:
-        verbose_name = "CITECatalog"
-        verbose_name_plural = "CITECatalogs"
+        verbose_name = "CTSCatalog"
+        verbose_name_plural = "CTSCatalogs"
         ordering = ["urn"]
 
     def __str__(self):
         return self.urn
 
 
-class CTSDatum(models.Model):
+class CTSDatum(GenericRelationMixin):
     """
     urn:cts:greekLit:tlg5026.msAext.va_dipl:1.135.comment
     """
@@ -231,4 +254,34 @@ class CTSDatum(models.Model):
         return f"{self.position}"
 
     def __str__(self):
-        return f"{self.citelibrary} {self.citecatalog} [line={self.position}]"
+        return f"{self.citelibrary} {self.ctscatalog} [line={self.position}]"
+
+
+class Relation(models.Model):
+    """
+    A unique triple of URNs combining to create a S-V-O relationship.
+    """
+
+    subject_content_type = models.ForeignKey(
+        ContentType, on_delete=models.CASCADE, related_name="subject_relations", null=True, blank=True
+    )
+    subject_id = models.PositiveIntegerField(null=True, blank=True)
+    subject_content_object = GenericForeignKey("subject_content_type", "subject_id")
+    verb = models.ForeignKey(
+        "library.CITEDatum", related_name="relations", on_delete=models.CASCADE
+    )
+    object_content_type = models.ForeignKey(
+        ContentType, on_delete=models.CASCADE, related_name="object_relations", null=True, blank=True
+    )
+    object_id = models.PositiveIntegerField(null=True, blank=True)
+    object_content_object = GenericForeignKey("object_content_type", "object_id")
+    object_at = models.CharField(max_length=255, null=True, blank=True)
+
+    citelibrary = models.ForeignKey(
+        "library.CITELibrary", related_name="relations", on_delete=models.CASCADE
+    )
+
+    def __str__(self):
+        subject_obj = self.subject_content_object
+        object_obj = self.object_content_object
+        return f"{subject_obj} - {self.verb} - {object_obj}"

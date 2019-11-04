@@ -12,12 +12,17 @@ from . import constants, factories, models
 LIBRARY_DATA_PATH = os.path.join(settings.PROJECT_ROOT, "data", "library")
 LIBRARY_METADATA_PATH = os.path.join(LIBRARY_DATA_PATH, "metadata.json")
 
-IGNORE_BLOCKS = ["#!cexversion", "#!citelibrary", "#!imagedata", "#!relations"]
+IGNORE_BLOCKS = ["#!cexversion", "#!citelibrary", "#!imagedata"]
+
+
+def log(*objs):
+    print(*objs, file=sys.stderr, sep="\n")
 
 
 class Visitor:
     def __init__(self, index):
         self.index = index
+        self.mirror = {}
         self.factory_lookup = {
             "#!citecollections": factories.CITECollectionFactory(),
             "#!citeproperties": factories.CITEPropertyFactory(),
@@ -25,10 +30,11 @@ class Visitor:
             "#!ctscatalog": factories.CTSCatalogFactory(),
             "#!ctsdata": factories.CTSDatumFactory(),
             "#!datamodels": factories.DatamodelFactory(),
+            "#!relations": factories.RelationFactory(),
             "#!imagedata": None,
-            "#!relations": None,
         }
         self.visited = 0
+        self.problems = []
 
     @staticmethod
     def is_urn(value):
@@ -37,36 +43,74 @@ class Visitor:
         except TypeError:
             return False
 
-    def filter_nodes(self, obj_kwargs):
-        for key, value in obj_kwargs.items():
-            if key != "urn" and not self.is_urn(key):
-                if self.is_urn(value):
-                    yield key, value
+    def get_urn_position(self, field, urn, obj_kwargs):
+        return next(
+            idx for idx, item in enumerate(obj_kwargs[field])
+            if item == urn
+        )
 
-    def resolve_node(self, urn, block, obj_kwargs):
-        for key, value in self.filter_nodes(obj_kwargs):
-            related_urn = value
-            data = self.index[related_urn]
-            if not isinstance(data, tuple):
-                obj_kwargs[key] = data
-            else:
-                related_block, related_obj_kwargs = data
-                resolved = self.resolve_node(
-                    related_urn, related_block, related_obj_kwargs
+    def get_urn_permutation(self, urn):
+        # TODO: Needs a bit of a rethink...
+        return next(
+            key for key in self.index.keys()
+            if isinstance(key, str) and urn in key
+        )
+
+    def get_node_data(self, urn, obj_kwargs):
+        try:
+            return self.index[urn]
+        except KeyError:
+            try:
+                return self.index[self.get_urn_permutation(urn)]
+            except StopIteration:
+                self.problems.append(
+                    (f"URN (or permutations) not in index: {urn}", obj_kwargs)
                 )
-                obj_kwargs[key] = resolved
+                return None
 
-        instance = self.factory_lookup[block].get(**obj_kwargs)
-        self.visited += 1
-        self.index[urn] = instance
-        return instance
+    def resolve_related_node(self, urn, field, data, obj_kwargs):
+        if isinstance(data, tuple):
+            data = self.resolve_node(urn, data)
+
+        if isinstance(obj_kwargs[field], list):
+            idx = self.get_urn_position(field, urn, obj_kwargs)
+            obj_kwargs[field][idx] = data
+        else:
+            obj_kwargs[field] = data
+
+    def filter_urn_nodes(self, obj_kwargs):
+        for field, value in obj_kwargs.items():
+            if field != "urn" and not self.is_urn(field):
+                if isinstance(value, list):
+                    for item in value:
+                        if self.is_urn(item):
+                            yield field, item
+                elif self.is_urn(value):
+                    yield field, value
+
+    def resolve_node(self, key, data):
+        block, obj_kwargs = data
+        for field, urn in self.filter_urn_nodes(obj_kwargs):
+            data = self.get_node_data(urn, obj_kwargs)
+            if not data:
+                continue
+            self.resolve_related_node(urn, field, data, obj_kwargs)
+
+        instance, created = self.factory_lookup[block].get(**obj_kwargs)
+        if instance:
+            if created:
+                self.visited += 1
+                self.mirror[key] = instance
+            return instance
+
+        self.problems.append(("Unable to instantiate obj:", obj_kwargs))
+        return False
 
     def apply(self):
-        for urn, data in self.index.items():
+        for key, data in self.index.items():
             if isinstance(data, tuple):
-                block, obj_kwargs = data
-                self.resolve_node(urn, block, obj_kwargs)
-        return self.visited
+                self.resolve_node(key, data)
+        return self.visited, self.problems
 
 
 class Parser:
@@ -111,8 +155,8 @@ class Parser:
             columns in self.columns.values() or columns in self.dynamic_columns.values()
         )
 
-    def index_obj(self, obj_kwargs):
-        self.index[obj_kwargs["urn"]] = (self.current_block, obj_kwargs)
+    def index_obj(self, obj_kwargs, key=None):
+        self.index[key if key else obj_kwargs["urn"]] = (self.current_block, obj_kwargs)
 
     def map_columns_to_model_fields(self, urn=None):
         if urn:
@@ -254,10 +298,77 @@ class Parser:
         )
         self.index_obj(obj_kwargs)
 
-    def handle_imagedata(self, line, **data):
-        raise NotImplementedError()
-
     def handle_relations(self, line, **data):
+        ignore = [
+            "urn:cts:greekLit:tlg0012.tlg001.msA:4",
+            "urn:cts:greekLit:tlg0012.tlg001.msA:8",
+            "urn:cts:greekLit:tlg0012.tlg001.msA:9",
+            "urn:cts:greekLit:tlg0012.tlg001.msA:10",
+            "urn:cts:greekLit:tlg0012.tlg001.msA:11",
+            "urn:cts:greekLit:tlg0012.tlg001.msA:95",
+            "urn:cts:greekLit:tlg0012.tlg001.msA:311",
+            "urn:cts:greekLit:tlg0012.tlg001.msA:18.604_605",
+            "urn:cts:greekLit:tlg0012.tlg001.msA:18.603-18.604_605",
+        ]
+        split = self.split_line(line)
+        subject_urn, verb_urn, object_urn = self.split_line(line)
+
+        if object_urn in ignore:
+            return
+
+        # Verbs are usually defined in themselves as citedata nodes but that's
+        # not the case for urn:cite2:hmt:verbs.v1:appearsIn. I think it is
+        # supposed to be: urn:cite2:cite:verbs.v1:appearsIn, which is defined
+        # but never used at all. So let's work around that.
+        if verb_urn == "urn:cite2:hmt:verbs.v1:appearsIn":
+            verb_urn = "urn:cite2:cite:verbs.v1:appearsIn"
+
+        object_urn_stem, positions = object_urn.rsplit(":", maxsplit=1)
+
+        object_at = None
+        if "@" in positions:
+            positions, object_at = positions.split("@")
+
+        is_passage = False
+        passage_range = positions.split("-")
+        if len(passage_range) > 1:
+            is_passage = True
+            references = [reference.split(".") for reference in passage_range]
+            # Detect and fix malformed passage URNs like:
+            # urn:cts:greekLit:tlg0012.tlg001.msA:1.13-14
+            # It should have the 'book' in each case:
+            # urn:cts:greekLit:tlg0012.tlg001.msA:1.13-1.14
+            try:
+                assert all(len(reference) == 2 for reference in references)
+            except AssertionError:
+                first = references[0][0]
+                fixed = []
+                for reference in references:
+                    if len(reference) == 1:
+                        fixed.append([first, reference[0]])
+                    else:
+                        fixed.append(reference)
+                assert all(len(reference) == 2 for reference in fixed)
+                references = fixed
+
+            book = set([reference[0] for reference in references])
+            assert len(book) == 1
+            book = book.pop()
+            start, end = [int(reference[1]) for reference in references]
+            passage = [
+                f"{object_urn_stem}:{book}.{line}" for line in range(start, end + 1)
+            ]
+
+        obj_kwargs = {
+            "subject_obj": subject_urn,
+            "verb": verb_urn,
+            "object_obj": [object_urn] if not is_passage else passage,
+            "object_at": object_at,
+            "citelibrary": self.library_obj,
+        }
+        self.index_obj(key=tuple(split), obj_kwargs=obj_kwargs)
+
+    def handle_imagedata(self, line, **data):
         raise NotImplementedError()
 
     @property
@@ -289,8 +400,13 @@ def _import_library(data):
     )
 
     index = Parser(full_content_path, library_obj).apply()
-    visited = Visitor(index).apply()
-    print(f"Created {visited} objects.", file=sys.stderr)
+    visited, problems = Visitor(index).apply()
+
+    failed = len(problems)
+    plural = f"object{'s' if failed > 1 else ''}"
+    log(*(f"{urn}:\n{obj}" for urn, obj in problems))
+    log(f"Visited {visited} {plural}.")
+    log(f"Could not create {failed} {plural}.")
 
 
 def import_libraries(reset=True):
