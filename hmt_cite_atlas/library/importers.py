@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import sys
 
 from django.conf import settings
@@ -14,6 +15,8 @@ LIBRARY_METADATA_PATH = os.path.join(LIBRARY_DATA_PATH, "metadata.json")
 
 IGNORE_BLOCKS = ["#!cexversion", "#!citelibrary", "#!imagedata"]
 
+RE_BOOK_RANGE = re.compile(r":[0-9]*$")
+
 
 def log(*objs):
     print(*objs, file=sys.stderr, sep="\n")
@@ -21,8 +24,8 @@ def log(*objs):
 
 class Visitor:
     def __init__(self, index):
+        self.keys = tuple(index.keys())
         self.index = index
-        self.mirror = {}
         self.factory_lookup = {
             "#!citecollections": factories.CITECollectionFactory(),
             "#!citeproperties": factories.CITEPropertyFactory(),
@@ -44,16 +47,11 @@ class Visitor:
             return False
 
     def get_urn_position(self, field, urn, obj_kwargs):
-        return next(
-            idx for idx, item in enumerate(obj_kwargs[field])
-            if item == urn
-        )
+        return next(idx for idx, item in enumerate(obj_kwargs[field]) if item == urn)
 
     def get_urn_permutation(self, urn):
-        # TODO: Needs a bit of a rethink...
         return next(
-            key for key in self.index.keys()
-            if isinstance(key, str) and urn in key
+            key for key in self.index.keys() if isinstance(key, str) and urn in key
         )
 
     def get_node_data(self, urn, obj_kwargs):
@@ -63,20 +61,21 @@ class Visitor:
             try:
                 return self.index[self.get_urn_permutation(urn)]
             except StopIteration:
-                self.problems.append(
-                    (f"URN (or permutations) not in index: {urn}", obj_kwargs)
-                )
                 return None
 
-    def resolve_related_node(self, urn, field, data, obj_kwargs):
-        if isinstance(data, tuple):
-            data = self.resolve_node(urn, data)
-
-        if isinstance(obj_kwargs[field], list):
-            idx = self.get_urn_position(field, urn, obj_kwargs)
-            obj_kwargs[field][idx] = data
-        else:
-            obj_kwargs[field] = data
+    def expand_book_lines(self, book, field):
+        # We need to do some massaging here in case the object doesn't refer to
+        # either a single line or a range of line but an entire 'book'.
+        # Because, whatever those values might be they cannot be extracted from
+        # the URN itself and we need to build them from the index.
+        line_re = r":" + re.escape(book) + r".[0-9]+"
+        for urn in self.index.keys():
+            # Relation rows are keyed over their S-V-O triple (as a tuple) so
+            # we can skip those immediately.
+            if isinstance(urn, tuple):
+                continue
+            if re.search(line_re, urn):
+                yield field, urn
 
     def filter_urn_nodes(self, obj_kwargs):
         for field, value in obj_kwargs.items():
@@ -84,15 +83,48 @@ class Visitor:
                 if isinstance(value, list):
                     for item in value:
                         if self.is_urn(item):
-                            yield field, item
+                            book_range = re.search(RE_BOOK_RANGE, item)
+                            if book_range:
+                                book = book_range.group()[1:]
+                                yield from self.expand_book_lines(book, field)
+                            else:
+                                yield field, item
+
                 elif self.is_urn(value):
                     yield field, value
+
+    def resolve_related_node(self, urn, field, data, obj_kwargs):
+        if isinstance(data, tuple):
+            data = self.resolve_node(urn, data)
+            if not data:
+                return
+
+        if isinstance(obj_kwargs[field], list):
+            # We need to account for whether the list was pre-existing in its
+            # entirety or if we are building it up dynamically as a book range.
+            # In the first case, we can cleanly insert objects by their index.
+            try:
+                idx = self.get_urn_position(field, urn, obj_kwargs)
+                obj_kwargs[field][idx] = data
+            except StopIteration:
+                # Book ranges will only ever have one value in them as we
+                # didn't do any prior destructuring during the parse-stage.
+                # So let's eliminate that value here first before accumulating
+                # the objects in order.
+                if isinstance(obj_kwargs[field][0], str):
+                    obj_kwargs[field] = []
+                obj_kwargs[field].append(data)
+        else:
+            obj_kwargs[field] = data
 
     def resolve_node(self, key, data):
         block, obj_kwargs = data
         for field, urn in self.filter_urn_nodes(obj_kwargs):
             data = self.get_node_data(urn, obj_kwargs)
             if not data:
+                self.problems.append(
+                    (f"URN (or permutations) not in index: {urn}", obj_kwargs)
+                )
                 continue
             self.resolve_related_node(urn, field, data, obj_kwargs)
 
@@ -100,14 +132,15 @@ class Visitor:
         if instance:
             if created:
                 self.visited += 1
-                self.mirror[key] = instance
+                self.index[key] = instance
             return instance
 
         self.problems.append(("Unable to instantiate obj:", obj_kwargs))
         return False
 
     def apply(self):
-        for key, data in self.index.items():
+        for key in self.keys:
+            data = self.index[key]
             if isinstance(data, tuple):
                 self.resolve_node(key, data)
         return self.visited, self.problems
@@ -299,22 +332,22 @@ class Parser:
         self.index_obj(obj_kwargs)
 
     def handle_relations(self, line, **data):
-        ignore = [
-            "urn:cts:greekLit:tlg0012.tlg001.msA:4",
-            "urn:cts:greekLit:tlg0012.tlg001.msA:8",
-            "urn:cts:greekLit:tlg0012.tlg001.msA:9",
-            "urn:cts:greekLit:tlg0012.tlg001.msA:10",
-            "urn:cts:greekLit:tlg0012.tlg001.msA:11",
-            "urn:cts:greekLit:tlg0012.tlg001.msA:95",
-            "urn:cts:greekLit:tlg0012.tlg001.msA:311",
-            "urn:cts:greekLit:tlg0012.tlg001.msA:18.604_605",
-            "urn:cts:greekLit:tlg0012.tlg001.msA:18.603-18.604_605",
-        ]
+        transform = {
+            # "urn:cts:greekLit:tlg0012.tlg001.msA:4",
+            # "urn:cts:greekLit:tlg0012.tlg001.msA:8",
+            # "urn:cts:greekLit:tlg0012.tlg001.msA:9",
+            # "urn:cts:greekLit:tlg0012.tlg001.msA:10",
+            # "urn:cts:greekLit:tlg0012.tlg001.msA:11",
+            # "urn:cts:greekLit:tlg0012.tlg001.msA:95",
+            # "urn:cts:greekLit:tlg0012.tlg001.msA:311",
+            "urn:cts:greekLit:tlg0012.tlg001.msA:18.604_605": "urn:cts:greekLit:tlg0012.tlg001.msA:18.603-18.604",
+            "urn:cts:greekLit:tlg0012.tlg001.msA:18.603-18.604_605": "urn:cts:greekLit:tlg0012.tlg001.msA:18.604-18.605",
+        }
         split = self.split_line(line)
         subject_urn, verb_urn, object_urn = self.split_line(line)
 
-        if object_urn in ignore:
-            return
+        if object_urn in transform:
+            object_urn = transform[object_urn]
 
         # Verbs are usually defined in themselves as citedata nodes but that's
         # not the case for urn:cite2:hmt:verbs.v1:appearsIn. I think it is

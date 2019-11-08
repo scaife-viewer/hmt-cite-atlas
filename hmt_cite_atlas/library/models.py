@@ -263,7 +263,11 @@ class Relation(models.Model):
     """
 
     subject_content_type = models.ForeignKey(
-        ContentType, on_delete=models.CASCADE, related_name="subject_relations", null=True, blank=True
+        ContentType,
+        on_delete=models.CASCADE,
+        related_name="subject_relations",
+        null=True,
+        blank=True,
     )
     subject_id = models.PositiveIntegerField(null=True, blank=True)
     subject_content_object = GenericForeignKey("subject_content_type", "subject_id")
@@ -271,7 +275,11 @@ class Relation(models.Model):
         "library.CITEDatum", related_name="relations", on_delete=models.CASCADE
     )
     object_content_type = models.ForeignKey(
-        ContentType, on_delete=models.CASCADE, related_name="object_relations", null=True, blank=True
+        ContentType,
+        on_delete=models.CASCADE,
+        related_name="object_relations",
+        null=True,
+        blank=True,
     )
     object_id = models.PositiveIntegerField(null=True, blank=True)
     object_content_object = GenericForeignKey("object_content_type", "object_id")
