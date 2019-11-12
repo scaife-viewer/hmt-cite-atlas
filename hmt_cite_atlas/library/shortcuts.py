@@ -1,6 +1,9 @@
 from .models import CITEDatum, CTSCatalog, CTSDatum
 
 
+CITATION_SCHEME_SCHOLION = "scholion"
+
+
 def get_lines_for_folio(folio_urn):
     """
     get_lines_for_folio("urn:cite2:hmt:msA.v1:12r")
@@ -17,9 +20,9 @@ def get_lines_for_folio(folio_urn):
         fields__contains={"urn:cite2:hmt:va_dse.v1.surface:": folio.urn}
     )
 
-    # @@@ what a hack, but is there another way to know the "work"
-    # vs commentaries?
-    catalog_obj = CTSCatalog.objects.get(work_title="Iliad")
+    catalog_obj = CTSCatalog.objects.exclude(
+        citation_scheme__contains=[CITATION_SCHEME_SCHOLION]
+    ).get()
     book_line_urn = catalog_obj.urn
 
     # @@@ might be a way we can do some db-level "icontains" against `urn:cite2:hmt:va_dse.v1.passage:`
