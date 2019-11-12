@@ -2,13 +2,14 @@ import abc
 import copy
 
 from .models import (
+    Book,
     CITECollection,
     CITEDatum,
     CITEProperty,
     CTSCatalog,
-    CTSDatum,
     Datamodel,
-    Relation
+    Relation,
+    Scholion
 )
 
 
@@ -34,10 +35,6 @@ class CTSCatalogFactory(AbstractFactory):
     model = CTSCatalog
 
 
-class CTSDatumFactory(AbstractFactory):
-    model = CTSDatum
-
-
 class DatamodelFactory(AbstractFactory):
     model = Datamodel
 
@@ -61,3 +58,24 @@ class RelationFactory:
         for obj in object_objs:
             obj.object_relations.add(instance)
         return instance, True
+
+
+class IndexedAbstractFactory(abc.ABC):
+    idx = 0
+    position = 1
+
+    def get(self, urn, **kwargs):
+        instance, created = self.model.objects.get_or_create(
+            urn=urn, **{"idx": self.idx, "position": self.position, **kwargs}
+        )
+        self.idx += 1
+        self.position += 1
+        return instance
+
+
+class BookFactory(IndexedAbstractFactory):
+    model = Book
+
+
+class ScholionFactory(IndexedAbstractFactory):
+    model = Scholion

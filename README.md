@@ -74,7 +74,7 @@ Get all libraries and the URNs of the versions they contain.
 }
 ```
 
-Get the first line of every version in the library.
+Get the first line of the Iliad.
 ```
 {
   lines(position: 1) {
@@ -92,10 +92,29 @@ Get the first line of every version in the library.
 }
 ```
 
+Get the first line of all the scholia on the Iliad.
+```
+{
+  sections(position: 1) {
+    edges {
+      node {
+        urn
+        textContent
+      }
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}
+```
+
+
 Page through the Iliad ten lines at a time.
 ```
 {
-  lines(version_Urn: "urn:cts:greekLit:tlg0012.tlg001.msA", first:10) {
+  lines(book_Urn: "urn:cts:greekLit:tlg0012.tlg001.msA:", first:10) {
     edges {
       cursor
       node {
