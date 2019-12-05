@@ -7,6 +7,7 @@ from django.views.decorators.cache import cache_page
 
 from ..library.models import CITEDatum
 from .shims import AlignmentsShim
+from .shortcuts import build_absolute_url
 from .utils import (
     WebAnnotationCollectionGenerator,
     WebAnnotationGenerator,
@@ -44,12 +45,8 @@ def serve_web_annotation_collection(request, urn, format):
     # @@@ query alignments from Postgres
     alignments = AlignmentsShim(urn).get_alignment_data(fields=["idx"])
     paginator = Paginator(alignments, per_page=PAGE_SIZE)
-    data = {
-        "@context": "http://www.w3.org/ns/anno.jsonld",
+    urls = {
         "id": reverse_lazy("serve_web_annotation_collection", args=[urn, format]),
-        "type": "AnnotationCollection",
-        "label": f"Translation Alignments for {urn}",
-        "total": paginator.count,
         "first": reverse_lazy(
             "serve_web_annotation_page",
             args=[urn, format, as_zero_based(paginator.page_range[0])],
@@ -58,6 +55,15 @@ def serve_web_annotation_collection(request, urn, format):
             "serve_web_annotation_page",
             args=[urn, format, as_zero_based(paginator.page_range[-1])],
         ),
+    }
+    data = {
+        "@context": "http://www.w3.org/ns/anno.jsonld",
+        "id": build_absolute_url(urls["id"]),
+        "type": "AnnotationCollection",
+        "label": f"Translation Alignments for {urn}",
+        "total": paginator.count,
+        "first": build_absolute_url(urls["first"]),
+        "last": build_absolute_url(urls["last"]),
     }
     return JsonResponse(data)
 
@@ -76,13 +82,17 @@ def serve_web_annotation_page(request, urn, format, zero_page_number):
     except EmptyPage:
         raise Http404
     collection = WebAnnotationCollectionGenerator(urn, page.object_list, format)
-    data = {
-        "@context": "http://www.w3.org/ns/anno.jsonld",
+    urls = {
         "id": reverse_lazy(
             "serve_web_annotation_page", args=[urn, format, as_zero_based(page_number)]
         ),
+        "part_of": reverse_lazy("serve_web_annotation_collection", args=[urn, format]),
+    }
+    data = {
+        "@context": "http://www.w3.org/ns/anno.jsonld",
+        "id": build_absolute_url(urls["id"]),
         "type": "AnnotationPage",
-        "partOf": reverse_lazy("serve_web_annotation_collection", args=[urn, format]),
+        "partOf": build_absolute_url(urls["part_of"]),
         "startIndex": as_zero_based(page.start_index()),
         "items": collection.items,
     }

@@ -1,8 +1,10 @@
 from django.db.models import Q
+from django.urls import reverse_lazy
 from django.utils.functional import cached_property
 
 from ..iiif import IIIFResolver
 from ..library.models import CITEDatum
+from .shortcuts import build_absolute_url
 
 
 def as_zero_based(int_val):
@@ -159,23 +161,28 @@ class WebAnnotationGenerator:
                 body["value"] = self.as_html(lines)
         return bodies
 
-    @property
-    def text_obj(self):
+    def get_absolute_url(self, body_format):
+        url = reverse_lazy(
+            "serve_web_annotation",
+            kwargs={"urn": self.urn, "idx": self.idx, "format": body_format},
+        )
+        return build_absolute_url(url)
+
+    def get_object_for_body_format(self, body_format):
         obj = {
-            "body": self.get_textual_bodies("text"),
-            "id": f"/wa/{self.urn}/translation-alignment/{self.idx}/text/",
+            "body": self.get_textual_bodies(body_format),
+            "id": self.get_absolute_url(body_format),
         }
         obj.update(self.common_obj)
         return obj
 
     @property
+    def text_obj(self):
+        return self.get_object_for_body_format("text")
+
+    @property
     def html_obj(self):
-        obj = {
-            "body": self.get_textual_bodies("html"),
-            "id": f"/wa/{self.urn}/translation-alignment/{self.idx}/html/",
-        }
-        obj.update(self.common_obj)
-        return obj
+        return self.get_object_for_body_format("html")
 
 
 class WebAnnotationCollectionGenerator:
