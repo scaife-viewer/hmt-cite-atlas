@@ -1,3 +1,5 @@
+import os
+
 from django.utils.functional import cached_property
 
 import requests
@@ -12,7 +14,7 @@ class AlignmentsShim:
     and ship to explorehomer directly.
     """
 
-    GRAPHQL_ENDPOINT = "https://explorehomer-atlas-dev.herokuapp.com/graphql/"
+    GRAPHQL_ENDPOINT = os.environ.get("ATLAS_GRAPHQL_ENDPOINT", "https://explorehomer-feature-tr-vlxhmh.herokuapp.com/graphql/")
 
     def __init__(self, folio_urn):
         self.folio_urn = folio_urn
