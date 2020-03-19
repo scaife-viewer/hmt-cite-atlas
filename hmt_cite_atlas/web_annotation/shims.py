@@ -40,7 +40,8 @@ class AlignmentsShim:
         ref = self.get_ref()
         # @@@ hardcoded version urn
         # @@@ add the ability to get a count from an edge
-        predicate = f'version_Urn:"urn:cts:greekLit:tlg0012.tlg001.perseus-grc2" reference:"{ref}"'
+        reference = f"urn:cts:greekLit:tlg0012.tlg001.perseus-grc2:{ref}"
+        predicate = f'reference:"{reference}"'
         if idx:
             predicate = f"{predicate} idx: {idx}"
         resp = requests.post(
