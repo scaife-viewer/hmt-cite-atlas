@@ -97,13 +97,15 @@ def serve_web_annotation_page(request, urn, format, zero_page_number):
         "items": collection.items,
     }
     if page.has_previous():
-        data["prev"] = reverse_lazy(
+        prev_url = reverse_lazy(
             "serve_web_annotation_page",
             args=[urn, format, as_zero_based(page.previous_page_number())],
         )
+        data["prev"] = build_absolute_url(prev_url))
     if page.has_next():
-        data["next"] = reverse_lazy(
+        next_url = reverse_lazy(
             "serve_web_annotation_page",
             args=[urn, format, as_zero_based(page.next_page_number())],
         )
+        data["next"] = build_absolute_url(next_url))
     return JsonResponse(data)
