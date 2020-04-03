@@ -49,7 +49,7 @@ class AlignmentsShim:
             json={
                 "query": """
                 {
-                    alignmentChunks(%s) {
+                    textAlignmentChunks(%s) {
                         edges {
                             node {
                                 %s
@@ -61,6 +61,6 @@ class AlignmentsShim:
             },
         )
         data = []
-        for edge in resp.json()["data"]["alignmentChunks"]["edges"]:
+        for edge in resp.json()["data"]["textAlignmentChunks"]["edges"]:
             data.append(edge["node"])
         return data
