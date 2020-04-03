@@ -101,11 +101,11 @@ def serve_web_annotation_page(request, urn, format, zero_page_number):
             "serve_web_annotation_page",
             args=[urn, format, as_zero_based(page.previous_page_number())],
         )
-        data["prev"] = build_absolute_url(prev_url))
+        data["prev"] = build_absolute_url(prev_url)
     if page.has_next():
         next_url = reverse_lazy(
             "serve_web_annotation_page",
             args=[urn, format, as_zero_based(page.next_page_number())],
         )
-        data["next"] = build_absolute_url(next_url))
+        data["next"] = build_absolute_url(next_url)
     return JsonResponse(data)
