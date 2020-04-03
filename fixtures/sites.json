@@ -11,8 +11,8 @@
         "pk": 2,
         "model": "sites.site",
         "fields": {
-            "domain": "explorehomer-atlas-dev3.herokuapp.com",
-            "name": "Explore Homer ATLAS [dev3]"
+            "domain": "aniop-atlas-staging.eldarion.com",
+            "name": "AniOp ATLAS [staging]"
         }
     }
 ]
