@@ -14,7 +14,7 @@ DEBUG = bool(int(os.environ.get("DEBUG", "1")))
 # }
 
 DB_DATA_PATH = os.environ.get("DB_DATA_PATH", PROJECT_ROOT)
-SV_ATLAS_DB_PATH = os.path.join(DB_DATA_PATH, "db.sqlite")
+SV_ATLAS_DB_PATH = os.path.join(DB_DATA_PATH, os.environ.get("DB_NAME", "db.sqlite"))
 
 DATABASES = {
     "default": {
