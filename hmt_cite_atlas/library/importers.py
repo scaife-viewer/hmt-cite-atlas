@@ -308,6 +308,10 @@ class Parser:
 
     def handle_citedata(self, line, **data):
         urns = [item for item in self.split_line(line) if "urn:" in item]
+
+        if not urns:
+            return
+
         collection_urn = next(
             self.get_urn_root(urn)
             for urn in urns
