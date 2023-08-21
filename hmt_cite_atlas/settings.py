@@ -9,8 +9,24 @@ BASE_DIR = PACKAGE_ROOT
 
 DEBUG = bool(int(os.environ.get("DEBUG", "1")))
 
+# DATABASES = {
+#     "default": dj_database_url.config(default="postgres://localhost/hmt_cite_atlas")
+# }
+
+DB_DATA_PATH = os.environ.get("DB_DATA_PATH", PROJECT_ROOT)
+SV_ATLAS_DB_PATH = os.path.join(DB_DATA_PATH, "db.sqlite")
+
 DATABASES = {
-    "default": dj_database_url.config(default="postgres://localhost/hmt_cite_atlas")
+    "default": {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": SV_ATLAS_DB_PATH,
+        # @@@ this timeout may not be appropriate
+        # for all sites using scaife-viewer-atlas,
+        # but we will likely have an ATLAS specific
+        # database router / ingestion-specific
+        # config in the future anyways
+        "OPTIONS": {"timeout": 5 * 60},
+    }
 }
 
 ALLOWED_HOSTS = ["localhost"]
@@ -130,6 +146,7 @@ INSTALLED_APPS = [
     # Third-party
     "corsheaders",
     "graphene_django",
+    "django_jsonfield_backport",
     # Project
     "hmt_cite_atlas",
     "hmt_cite_atlas.library",
