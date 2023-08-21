@@ -6,6 +6,7 @@ import sys
 from django.conf import settings
 
 import case_conversion
+import tqdm
 
 from . import constants, factories, models
 
@@ -139,7 +140,8 @@ class Visitor:
         return False
 
     def apply(self):
-        for key in self.keys:
+        print("Visitor.apply")
+        for key in tqdm.tqdm(self.keys):
             data = self.index[key]
             if isinstance(data, tuple):
                 self.resolve_node(key, data)
@@ -418,7 +420,8 @@ class Parser:
         }[self.current_block]
 
     def apply(self):
-        for data in self.yield_data():
+        print("Parser.apply")
+        for data in tqdm.tqdm(self.yield_data()):
             self.handle(**data)
         return self.index
 
