@@ -18,12 +18,6 @@ IGNORE_BLOCKS = ["#!cexversion", "#!citelibrary", "#!imagedata"]
 
 RE_BOOK_RANGE = re.compile(r":[0-9]*$")
 
-NODE_STRATEGY_NONE = 1
-NODE_STRATEGY_ITER_KEYS = 2
-NODE_STRATEGY_DSE = 3
-NODE_STRATEGY = NODE_STRATEGY_DSE
-
-
 
 def log(*objs):
     print(*objs, file=sys.stderr, sep="\n")
@@ -57,30 +51,18 @@ class Visitor:
         return next(idx for idx, item in enumerate(obj_kwargs[field]) if item == urn)
 
     def get_urn_permutation(self, urn):
-        return next(
-            key for key in self.index.keys() if isinstance(key, str) and urn in key
-        )
+        lemma_urn = f"{urn}.lemma"
+        permutation = self.index.get(lemma_urn)
+        if permutation is None:
+            comment_urn = f"{urn}.comment"
+            permutation = self.index.get(comment_urn)
+        return permutation
 
     def get_node_data(self, urn, obj_kwargs):
         try:
             return self.index[urn]
         except KeyError:
-            if NODE_STRATEGY == NODE_STRATEGY_NONE:
-                return None
-            elif NODE_STRATEGY == NODE_STRATEGY_ITER_KEYS:
-                try:
-                    return self.index[self.get_urn_permutation(urn)]
-                except StopIteration:
-                    return None
-            elif NODE_STRATEGY == NODE_STRATEGY_DSE:
-                lemma_urn = f"{urn}.lemma"
-                permutation = self.index.get(lemma_urn)
-                if permutation is None:
-                    comment_urn = f"{urn}.comment"
-                    permutation = self.index.get(comment_urn)
-                if not permutation:
-                    print(f"\t{urn}")
-                return permutation
+            return self.get_urn_permutation(urn)
 
     def expand_book_lines(self, book, field):
         # We need to do some massaging here in case the object doesn't refer to
