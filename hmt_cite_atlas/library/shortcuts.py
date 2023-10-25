@@ -178,6 +178,7 @@ def do_textual_annotation_extraction(outdir):
     version_urn, _ = passage.rsplit(":", maxsplit=1)
     pieces = [p for p in version_urn.rsplit(":") if p]
     version_part = pieces[-1]
+    version_urn = f"{version_urn}:"
 
     urns = extract_folios_range(passage)
     folios = get_folios_in_range(urns)
