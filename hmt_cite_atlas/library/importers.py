@@ -58,6 +58,16 @@ class Visitor:
         if permutation is None:
             comment_urn = f"{urn}.comment"
             permutation = self.index.get(comment_urn)
+        # FIXME: These are two regressions from our previous approach
+        # urn:cts:greekLit:tlg5026.msAim.hmt:18.74#urn:cite2:cite:verbs.v1:commentsOn#urn:cts:greekLit:tlg0012.tlg001.msA:18.604_605
+        # urn:cts:greekLit:tlg0012.tlg001.msA-folios:250v.18.604_605
+        # urn:cts:greekLit:tlg5026.msA.hmt:9.667#urn:cite2:cite:verbs.v1:commentsOn#urn:cts:greekLit:tlg0012.tlg001.msA:9
+        # urn:cts:greekLit:tlg0012.tlg001.msA-folios:125v.9.1.comment
+
+        # 2023k
+        # urn:cts:greekLit:tlg5026.msAim.hmt:18.74|urn:cts:greekLit:tlg0012.tlg001.msA:18.604_605
+        # urn:cts:greekLit:tlg5026.msA.hmt:9.667|urn:cts:greekLit:tlg0012.tlg001.msA:9
+
         return permutation
 
     def get_node_data(self, urn, obj_kwargs):
