@@ -2,6 +2,7 @@ import json
 import os
 import re
 import sys
+from functools import cache
 
 from django.conf import settings
 
@@ -50,6 +51,7 @@ class Visitor:
     def get_urn_position(self, field, urn, obj_kwargs):
         return next(idx for idx, item in enumerate(obj_kwargs[field]) if item == urn)
 
+    @cache
     def get_urn_permutation(self, urn):
         lemma_urn = f"{urn}.lemma"
         permutation = self.index.get(lemma_urn)
@@ -64,6 +66,7 @@ class Visitor:
         except KeyError:
             return self.get_urn_permutation(urn)
 
+    @cache
     def expand_book_lines(self, book, field):
         # We need to do some massaging here in case the object doesn't refer to
         # either a single line or a range of line but an entire 'book'.
