@@ -15,7 +15,7 @@ from . import constants, factories, models
 LIBRARY_DATA_PATH = os.path.join(settings.PROJECT_ROOT, "data", "library")
 LIBRARY_METADATA_PATH = os.path.join(LIBRARY_DATA_PATH, "metadata.json")
 
-IGNORE_BLOCKS = ["#!cexversion", "#!citelibrary", "#!imagedata"]
+IGNORE_BLOCKS = ["#!cexversion", "#!citelibrary", "#!imagedata", "#!citerelationset"]
 
 RE_BOOK_RANGE = re.compile(r":[0-9]*$")
 
@@ -37,6 +37,7 @@ class Visitor:
             "#!datamodels": factories.DatamodelFactory(),
             "#!relations": factories.RelationFactory(),
             "#!imagedata": None,
+            "#!citerelationset": None,
         }
         self.visited = 0
         self.problems = []
@@ -257,10 +258,14 @@ class Parser:
 
     def handle_ctscatalog(self, line, **data):
         obj_kwargs = self.destructure_line(line)
-        if obj_kwargs["citation_scheme"] is not None:
-            obj_kwargs.update(
-                {"citation_scheme": obj_kwargs["citation_scheme"].split(",")}
-            )
+        try:
+            if obj_kwargs["citation_scheme"] is not None:
+                obj_kwargs.update(
+                    {"citation_scheme": obj_kwargs["citation_scheme"].split(",")}
+                )
+        except:
+            import ipdb; ipdb.set_trace();
+            raise
         self.index_obj(obj_kwargs)
 
     def handle_ctsdata(self, line_idx, line_ref, line, **data):
@@ -285,10 +290,18 @@ class Parser:
         self.index_obj(obj_kwargs)
 
     def handle_citeproperties(self, line, **data):
+        # expected
+        # Property|Label|Type|Authority list
+        # received
+        # URN|Label|Type|Authority list
         obj_kwargs = self.destructure_line(line)
         urn = obj_kwargs.pop("property")
-
-        collection_urn, column = urn.rsplit(".", maxsplit=1)
+        try:
+            collection_urn, column = urn.rsplit(".", maxsplit=1)
+        except:
+            if line.startswith('URN'):
+                return
+            raise
         collection_urn = f"{collection_urn}:"
         column = column.rstrip(":")
 
@@ -363,7 +376,13 @@ class Parser:
             "urn:cts:greekLit:tlg0012.tlg001.msA:18.603-18.604_605": "urn:cts:greekLit:tlg0012.tlg001.msA:18.604-18.605",
         }
         split = self.split_line(line)
-        subject_urn, verb_urn, object_urn = self.split_line(line)
+        try:
+            subject_urn, verb_urn, object_urn = self.split_line(line)
+        except ValueError:
+            if line.startswith("#"):
+                return
+            import ipdb;
+            ipdb.set_trace();
 
         if object_urn in transform:
             object_urn = transform[object_urn]
@@ -420,7 +439,7 @@ class Parser:
         }
         self.index_obj(key=tuple(split), obj_kwargs=obj_kwargs)
 
-    def handle_imagedata(self, line, **data):
+    def handle_not_implemented(self, line, **data):
         raise NotImplementedError()
 
     @property
@@ -432,8 +451,9 @@ class Parser:
             "#!citeproperties": self.handle_citeproperties,
             "#!citedata": self.handle_citedata,
             "#!datamodels": self.handle_datamodels,
-            "#!imagedata": self.handle_imagedata,
+            "#!imagedata": self.handle_not_implemented,
             "#!relations": self.handle_relations,
+            "#!citerelationset": self.handle_not_implemented,
         }[self.current_block]
 
     def apply(self):

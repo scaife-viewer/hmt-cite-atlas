@@ -22,7 +22,18 @@ class AbstractFactory(abc.ABC):
         instance = MEMOIZED_BY_URN.get(key)
         if instance:
             return instance, False
-        instance = self.model.objects.create(**kwargs)
+        try:
+            instance = self.model.objects.create(**kwargs)
+        except:
+            # urn:cts:greekLit:tlg0012.tlg001.msA.diplomatic:1.title|ἰλιάδος ἄλφα
+            # looking for ctscatalog object urn:cts:greekLit:tlg0012.tlg001.msA.diplomatic:
+            # e.g. in 2020h:
+            # #!ctscatalog
+            # urn#citationScheme#groupName#workTitle#versionLabel#exemplarLabel#online#lang
+            # urn:cts:greekLit:tlg0012.tlg001.msA:#book,line#Homeric epic#Iliad#HMT project diplomatic edition##true#grc
+
+            import ipdb; ipdb.set_trace()
+            raise
         MEMOIZED_BY_URN[key] = instance
         return instance, True
 

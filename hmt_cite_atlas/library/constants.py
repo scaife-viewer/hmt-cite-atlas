@@ -9,8 +9,9 @@ BLOCKS = {
     "#!imagedata",
     "#!relations",
     "#!datamodels",
+    "#!citerelationset",
 }
 
 COMMENT = "//"
 
-DELIMITER = "#"
+DELIMITER = "|"
