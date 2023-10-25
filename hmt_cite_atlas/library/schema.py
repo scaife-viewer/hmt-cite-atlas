@@ -3,26 +3,16 @@ from graphene.types import generic
 from graphene_django import DjangoObjectType
 from graphene_django.filter import DjangoFilterConnectionField
 
-from .models import (
-    CITECollection,
-    CITEDatum,
-    CITELibrary,
-    CITEProperty,
-    CTSCatalog,
-    CTSDatum,
-    Datamodel,
-    Relation
-)
+from .models import Book, CITELibrary, CTSCatalog, Line, Scholion, Section
 
 
-class CITELibraryNode(DjangoObjectType):
+class LibraryNode(DjangoObjectType):
     metadata = generic.GenericScalar()
-    citecollections = DjangoFilterConnectionField(lambda: CITECollectionNode)
-    datamodels = DjangoFilterConnectionField(lambda: DatamodelNode)
-    citeproperties = DjangoFilterConnectionField(lambda: CITEPropertyNode)
-    citedata = DjangoFilterConnectionField(lambda: CITEDatumNode)
-    ctscatalogs = DjangoFilterConnectionField(lambda: CTSCatalogNode)
-    ctsdata = DjangoFilterConnectionField(lambda: CTSDatumNode)
+    catalogs = DjangoFilterConnectionField(lambda: CatalogNode)
+    books = DjangoFilterConnectionField(lambda: BookNode)
+    scholia = DjangoFilterConnectionField(lambda: ScholionNode)
+    sections = DjangoFilterConnectionField(lambda: SectionNode)
+    lines = DjangoFilterConnectionField(lambda: LineNode)
 
     class Meta:
         model = CITELibrary
@@ -30,46 +20,7 @@ class CITELibraryNode(DjangoObjectType):
         filter_fields = ["name", "urn"]
 
 
-class CITECollectionNode(DjangoObjectType):
-    citeproperties = DjangoFilterConnectionField(lambda: CITEPropertyNode)
-    citedata = DjangoFilterConnectionField(lambda: CITEDatumNode)
-
-    class Meta:
-        model = CITECollection
-        interfaces = (relay.Node,)
-        filter_fields = ["urn", "citelibrary__urn"]
-
-
-class DatamodelNode(DjangoObjectType):
-    class Meta:
-        model = Datamodel
-        interfaces = (relay.Node,)
-        filter_fields = ["urn", "citecollection__urn", "citelibrary__urn"]
-
-
-class CITEPropertyNode(DjangoObjectType):
-    authority_list = generic.GenericScalar()
-    citedata = DjangoFilterConnectionField(lambda: CITEDatumNode)
-
-    class Meta:
-        model = CITEProperty
-        interfaces = (relay.Node,)
-        filter_fields = ["urn", "citecollection__urn", "citelibrary__urn"]
-
-
-class CITEDatumNode(DjangoObjectType):
-    label = String()
-    fields = generic.GenericScalar()
-
-    class Meta:
-        model = CITEDatum
-        interfaces = (relay.Node,)
-        filter_fields = ["urn", "citecollection__urn", "citelibrary__urn"]
-
-
-class CTSCatalogNode(DjangoObjectType):
-    citation_scheme = generic.GenericScalar()
-    ctsdata = DjangoFilterConnectionField(lambda: CTSDatumNode)
+class CatalogNode(DjangoObjectType):
 
     class Meta:
         model = CTSCatalog
@@ -77,51 +28,93 @@ class CTSCatalogNode(DjangoObjectType):
         filter_fields = ["urn", "citelibrary__urn"]
 
 
-class CTSDatumNode(DjangoObjectType):
+class BookNode(DjangoObjectType):
     label = String()
-    citation_scheme = generic.GenericScalar()
+
+    scholia = DjangoFilterConnectionField(lambda: ScholionNode)
+    sections = DjangoFilterConnectionField(lambda: SectionNode)
+    lines = DjangoFilterConnectionField(lambda: LineNode)
 
     class Meta:
-        model = CTSDatum
+        model = Book
         interfaces = (relay.Node,)
         filter_fields = [
             "urn",
-            "text_content",
-            "postition",
-            "index",
+            "position",
             "ctscatalog__urn",
             "citelibrary__urn",
         ]
 
 
-class RelationNode(DjangoObjectType):
+class ScholionNode(DjangoObjectType):
+    label = String()
+
+    sections = DjangoFilterConnectionField(lambda: SectionNode)
+
     class Meta:
-        model = Relation
+        model = Scholion
         interfaces = (relay.Node,)
-        filter_fields = ["urn", "citelibrary__urn"]
+        filter_fields = [
+            "urn",
+            "position",
+            "book__urn"
+            "book__position",
+            "ctscatalog__urn",
+            "citelibrary__urn",
+        ]
+
+
+class SectionNode(DjangoObjectType):
+    label = String()
+
+    class Meta:
+        model = Section
+        interfaces = (relay.Node,)
+        filter_fields = [
+            "urn",
+            "position",
+            "text_content",
+            "scholion__urn",
+            "scholion__position",
+            "book__urn",
+            "book__position",
+            "ctscatalog__urn",
+            "citelibrary__urn",
+        ]
+
+
+class LineNode(DjangoObjectType):
+    label = String()
+
+    class Meta:
+        model = Line
+        interfaces = (relay.Node,)
+        filter_fields = [
+            "urn",
+            "position",
+            "text_content",
+            "book__urn",
+            "book__position",
+            "ctscatalog__urn",
+            "citelibrary__urn",
+        ]
 
 
 class Query(ObjectType):
-    citelibrary = relay.Node.Field(CITELibraryNode)
-    citelibraries = DjangoFilterConnectionField(CITELibraryNode)
+    library = relay.Node.Field(LibraryNode)
+    libraries = DjangoFilterConnectionField(LibraryNode)
 
-    citecollection = relay.Node.Field(CITECollectionNode)
-    citecollections = DjangoFilterConnectionField(CITECollectionNode)
+    catalog = relay.Node.Field(CatalogNode)
+    catalogs = DjangoFilterConnectionField(CatalogNode)
 
-    datamodel = relay.Node.Field(DatamodelNode)
-    datamodels = DjangoFilterConnectionField(DatamodelNode)
+    book = relay.Node.Field(BookNode)
+    books = DjangoFilterConnectionField(BookNode)
 
-    citeproperty = relay.Node.Field(CITEPropertyNode)
-    citeproperties = DjangoFilterConnectionField(CITEPropertyNode)
+    scholion = relay.Node.Field(ScholionNode)
+    scholia = DjangoFilterConnectionField(ScholionNode)
 
-    citedatum = relay.Node.Field(CITEDatumNode)
-    citedata = DjangoFilterConnectionField(CITEDatumNode)
+    section = relay.Node.Field(SectionNode)
+    sections = DjangoFilterConnectionField(SectionNode)
 
-    ctscatalog = relay.Node.Field(CTSCatalogNode)
-    ctscatalogs = DjangoFilterConnectionField(CTSCatalogNode)
-
-    ctsdatum = relay.Node.Field(CTSDatumNode)
-    ctsdata = DjangoFilterConnectionField(CTSDatumNode)
-
-    relation = relay.Node.Field(RelationNode)
-    relations = relay.Node.Field(RelationNode)
+    line = relay.Node.Field(LineNode)
+    lines = DjangoFilterConnectionField(LineNode)

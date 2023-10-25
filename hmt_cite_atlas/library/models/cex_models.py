@@ -1,28 +1,9 @@
-from django.contrib.contenttypes.fields import (
-    GenericForeignKey,
-    GenericRelation
-)
+from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django_jsonfield_backport.models import JSONField
 from django.db import models
 
-
-class GenericRelationMixin(models.Model):
-    subject_relations = GenericRelation(
-        "library.Relation",
-        content_type_field="subject_content_type",
-        object_id_field="subject_id",
-        related_query_name="subject_obj",
-    )
-    object_relations = GenericRelation(
-        "library.Relation",
-        content_type_field="object_content_type",
-        object_id_field="object_id",
-        related_query_name="object_obj",
-    )
-
-    class Meta:
-        abstract = True
+from .mixins import GenericRelationMixin
 
 
 class CITELibrary(models.Model):
@@ -224,37 +205,6 @@ class CTSCatalog(models.Model):
 
     def __str__(self):
         return self.urn
-
-
-class CTSDatum(GenericRelationMixin):
-    """
-    urn:cts:greekLit:tlg5026.msAext.va_dipl:1.135.comment
-    """
-
-    urn = models.CharField(max_length=255, unique=True)
-    text_content = models.TextField(blank=True, null=True)
-
-    position = models.IntegerField()
-    idx = models.IntegerField(help_text="0-based index")
-
-    ctscatalog = models.ForeignKey(
-        "library.CTSCatalog", related_name="ctsdata", on_delete=models.CASCADE
-    )
-    citelibrary = models.ForeignKey(
-        "library.CITELibrary", related_name="ctsdata", on_delete=models.CASCADE
-    )
-
-    class Meta:
-        verbose_name = "CTSDatum"
-        verbose_name_plural = "CTSData"
-        ordering = ["idx"]
-
-    @property
-    def label(self):
-        return f"{self.position}"
-
-    def __str__(self):
-        return f"{self.citelibrary} {self.ctscatalog} [line={self.position}]"
 
 
 class Relation(models.Model):

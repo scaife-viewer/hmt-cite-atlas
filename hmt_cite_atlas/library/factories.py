@@ -3,13 +3,14 @@ import copy
 from functools import cache
 
 from .models import (
+    Book,
     CITECollection,
     CITEDatum,
     CITEProperty,
     CTSCatalog,
-    CTSDatum,
     Datamodel,
-    Relation
+    Relation,
+    Scholion
 )
 
 
@@ -54,10 +55,6 @@ class CTSCatalogFactory(AbstractFactory):
     model = CTSCatalog
 
 
-class CTSDatumFactory(AbstractFactory):
-    model = CTSDatum
-
-
 class DatamodelFactory(AbstractFactory):
     model = Datamodel
 
@@ -81,3 +78,30 @@ class RelationFactory:
         for obj in object_objs:
             obj.object_relations.add(instance)
         return instance, True
+
+
+class IndexedAbstractFactory(abc.ABC):
+    idx = 0
+    position = 1
+
+    def get(self, urn, **kwargs):
+        key = urn
+        instance = MEMOIZED_BY_URN.get(key)
+        if instance:
+            return instance
+
+        instance = self.model.objects.create(
+            urn=urn, **{"idx": self.idx, "position": self.position, **kwargs}
+        )
+        MEMOIZED_BY_URN[key] = instance
+        self.idx += 1
+        self.position += 1
+        return instance
+
+
+class BookFactory(IndexedAbstractFactory):
+    model = Book
+
+
+class ScholionFactory(IndexedAbstractFactory):
+    model = Scholion

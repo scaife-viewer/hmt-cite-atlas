@@ -2,15 +2,25 @@ import csv
 import json
 import os
 import re
+from collections import defaultdict
 from pathlib import Path
 
 from django.db.models import Q
 
+import tqdm
+
 from hmt_cite_atlas.iiif import IIIFResolver
-from hmt_cite_atlas.library.models import CITEDatum, CTSCatalog, CTSDatum
+from hmt_cite_atlas.library.models import (
+    CITEDatum,
+    CTSCatalog,
+    Line,
+    Scholion,
+    Section
+)
 
 
 CITATION_SCHEME_SCHOLION = "scholion"
+MSA_VERSION_URN = "urn:cts:greekLit:tlg0012.tlg001.msA:"
 
 
 def get_scholion_for_dse_scholion(scholion_cite_datum):
@@ -18,14 +28,8 @@ def get_scholion_for_dse_scholion(scholion_cite_datum):
     scholion_urns = [
         l.fields["urn:cite2:hmt:va_dse.v1.passage:"] for l in scholion_cite_datum
     ]
-    scholion_urns = [f"{su}." for su in scholion_urns]
-    predicate = Q()
-    for su in scholion_urns:
-        predicate.add(Q(urn__startswith=su), Q.OR)
-
-    # prefer returning this data in position order
-    datum = list(CTSDatum.objects.filter(predicate).order_by("position"))
-    return datum
+    scholion = Scholion.objects.filter(urn__in=scholion_urns)
+    return Section.objects.filter(scholion__in=scholion)
 
 
 def extract_folios_range(urn):
@@ -44,7 +48,7 @@ def get_folios_in_range(urns):
     # @@@ prefer idx
     return CITEDatum.objects.filter(
         urn__startswith=folio_datum_urn, id__gte=first.pk, id__lte=last.pk
-    )
+    ).order_by("id")
 
 
 def folio_sort_key(ref):
@@ -71,17 +75,14 @@ def get_lines_for_folio(folio_urn):
     kwargs = {f"fields__urn:cite2:hmt:va_dse.v1.surface:": folio.urn}
     folio_cite_datum = CITEDatum.objects.filter(**kwargs)
 
-    # kwargs = {"citation_scheme__contains": [CITATION_SCHEME_SCHOLION]}
-    # kwargs = {"citation_scheme": ["book", "line"]}
-    kwargs = {"citation_scheme__icontains": CITATION_SCHEME_SCHOLION}
-    catalog_obj = CTSCatalog.objects.exclude(**kwargs).get()
-    version_urn = catalog_obj.urn
+    version_urn = MSA_VERSION_URN
 
     # @@@ might be a way we can do some db-level "icontains" against `urn:cite2:hmt:va_dse.v1.passage:`
     line_cite_datum = folio_cite_datum.filter(fields__icontains=version_urn)
     # @@@ might be a way we can use a subquery against the values in `urn:cite2:hmt:va_dse.v1.passage:`
+    # FIXME: TextPartNode preferred
     line_urns = [l.fields["urn:cite2:hmt:va_dse.v1.passage:"] for l in line_cite_datum]
-    return CTSDatum.objects.filter(urn__in=line_urns)
+    return Line.objects.filter(urn__in=line_urns)
 
 
 def get_dse_scholion_for_folio(folio_urn):
@@ -118,13 +119,13 @@ def extract_text_annotations(folio_urn, version_urn=None):
     if not dse_scholion:
         raise IndexError
 
-    # e.g. urn:cts:greekLit:tlg5026.msAint.hmt:7.3007.comment
-    scholion = get_scholion_for_dse_scholion(dse_scholion)
     scholion_by_passage = {}
     for d in dse_scholion:
         key = d.fields["urn:cite2:hmt:va_dse.v1.passage:"]
         scholion_by_passage[key] = d
 
+    # e.g. urn:cts:greekLit:tlg5026.msAint.hmt:7.3007.comment
+    scholion = get_scholion_for_dse_scholion(dse_scholion)
     text_annotations = {}
     for scholia in scholion:
         s = scholia
@@ -186,7 +187,7 @@ def do_textual_annotation_extraction(outdir):
 
     folio_urns = sorted(folio_urns, key=folio_sort_key)
 
-    for folio in folios:
+    for folio in tqdm.tqdm(folios):
         extract_textual_annotations(outdir, version_part, version_urn, folio)
 
 
@@ -220,15 +221,11 @@ def do_cex_folios_export(outdir):
     Export an ATLAS compatible CEX file
     """
     folio_urns = CITEDatum.objects.filter(urn__startswith="urn:cite2:hmt:msA.v1:")
-    lookup = {}
-    for folio_urn in folio_urns:
-        urn = folio_urn.urn
-        lines = get_lines_for_folio(urn)
-        if folio_urn in lookup:
-            print(f"{urn}")
-            lookup[urn].extend(lines)
-        else:
-            lookup[urn] = lines
+    lookup = defaultdict(list)
+    for obj in tqdm.tqdm(folio_urns):
+        folio_urn = obj.urn
+        lines = get_lines_for_folio(folio_urn)
+        lookup[folio_urn].extend(list(lines))
 
     rows = []
     version_urn = "urn:cts:greekLit:tlg0012.tlg001.msA-folios"
@@ -245,6 +242,18 @@ def do_cex_folios_export(outdir):
         writer = csv.writer(f, delimiter="#")
         for row in rows:
             writer.writerow(row[1:])
+
+
+def do_cex_export(outdir):
+    """
+    Export an ATLAS compatible CEX file for the msA
+    """
+    version_obj = CTSCatalog.objects.get(urn=MSA_VERSION_URN)
+    outf = outdir / "tlg0012.tlg001.msA.cex"
+    with outf.open("w", encoding="utf-8") as f:
+        writer = csv.writer(f, delimiter="#")
+        for line in version_obj.lines.all().order_by("idx"):
+            writer.writerow([line.urn, line.text_content])
 
 
 def extract_image_annotation(folio, version_urn):
@@ -294,7 +303,7 @@ def extract_image_annotations(outdir, version_urn, version_part, folio):
     try:
         annotation = extract_image_annotation(folio, version_urn)
     except KeyError:
-        print(f"no passages were found for {folio.urn}")
+        print(f"no image annotations were found for {folio.urn}")
         return
 
     urn, image_name = annotation["urn"].rsplit(":", maxsplit=1)
@@ -311,9 +320,8 @@ def do_extract_image_annotations(outdir):
     version_urn = f"{version_urn}:"
     urns = extract_folios_range(passage)
     folios = get_folios_in_range(urns)
-    for folio in folios:
+    for folio in tqdm.tqdm(folios):
         extract_image_annotations(outdir, version_urn, version_part, folio)
-        break
 
 
 def main():
@@ -324,6 +332,7 @@ def main():
     # no annotations found for urn:cite2:hmt:msA.v1:272v
     do_textual_annotation_extraction(outdir)
     # do_cex_folios_export(outdir)
+    # do_cex_export(outdir)
     # do_extract_image_annotations(outdir)
 
 

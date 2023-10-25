@@ -1,14 +1,41 @@
 from django.contrib import admin
 
 from .models import (
+    Book,
     CITECollection,
     CITEDatum,
     CITELibrary,
     CITEProperty,
     CTSCatalog,
-    CTSDatum,
-    Datamodel
+    Datamodel,
+    Line,
+    Scholion,
+    Section
 )
+
+
+@admin.register(Book)
+class BookAdmin(admin.ModelAdmin):
+    list_display = ("id", "urn", "position", "idx")
+    list_filter = ("ctscatalog", "citelibrary")
+
+
+@admin.register(Scholion)
+class ScholionAdmin(admin.ModelAdmin):
+    list_display = ("id", "urn", "position", "idx")
+    list_filter = ("book", "ctscatalog", "citelibrary")
+
+
+@admin.register(Section)
+class SectionAdmin(admin.ModelAdmin):
+    list_display = ("id", "urn", "position", "idx", "text_content")
+    list_filter = ("scholion", "book", "ctscatalog", "citelibrary")
+
+
+@admin.register(Line)
+class LineAdmin(admin.ModelAdmin):
+    list_display = ("id", "urn", "position", "idx", "text_content")
+    list_filter = ("book", "ctscatalog", "citelibrary")
 
 
 @admin.register(CITELibrary)
@@ -63,17 +90,3 @@ class CTSCatalogAdmin(admin.ModelAdmin):
         "citelibrary",
     )
     list_filter = ("citelibrary",)
-
-
-@admin.register(CTSDatum)
-class CTSDatumAdmin(admin.ModelAdmin):
-    list_display = (
-        "id",
-        "urn",
-        "text_content",
-        "position",
-        "idx",
-        "ctscatalog",
-        "citelibrary",
-    )
-    list_filter = ("ctscatalog", "citelibrary")
