@@ -1,5 +1,6 @@
 import abc
 import copy
+from functools import cache
 
 from .models import (
     CITECollection,
@@ -12,10 +13,18 @@ from .models import (
 )
 
 
+MEMOIZED_BY_URN = {}
+
+
 class AbstractFactory(abc.ABC):
     def get(self, **kwargs):
-        instance, created = self.model.objects.get_or_create(**kwargs)
-        return instance, created
+        key = kwargs["urn"]
+        instance = MEMOIZED_BY_URN.get(key)
+        if instance:
+            return instance, False
+        instance = self.model.objects.create(**kwargs)
+        MEMOIZED_BY_URN[key] = instance
+        return instance, True
 
 
 class CITECollectionFactory(AbstractFactory):
