@@ -1,6 +1,6 @@
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
-from django.contrib.postgres.fields import JSONField
+from django_jsonfield_backport.models import JSONField
 from django.db import models
 
 from .mixins import GenericRelationMixin
@@ -14,7 +14,7 @@ class CITELibrary(models.Model):
     urn = models.CharField(max_length=255, unique=True)
     name = models.CharField(max_length=255, blank=True, null=True)
 
-    metadata = JSONField(encoder="", default=dict, blank=True)
+    metadata = JSONField(default=dict, blank=True)
     """
     {
         "cex_version": "",
@@ -114,7 +114,7 @@ class CITEProperty(models.Model):
     urn = models.CharField(max_length=255, unique=True)
     label = models.CharField(max_length=255, blank=True, null=True)
     property_type = models.CharField(max_length=8, choices=PROPERTY_TYPE_CHOICES)
-    authority_list = JSONField(encoder="", default=list, blank=True, null=True)
+    authority_list = JSONField(default=list, blank=True, null=True)
     labelling_property = models.BooleanField()
     ordering_property = models.BooleanField()
 
@@ -142,7 +142,7 @@ class CITEDatum(GenericRelationMixin):
     """
 
     urn = models.CharField(max_length=255, unique=True)
-    fields = JSONField(encoder="", default=dict, blank=True)
+    fields = JSONField(default=dict, blank=True)
 
     citecollection = models.ForeignKey(
         "library.CITECollection", related_name="citedata", on_delete=models.CASCADE
@@ -186,7 +186,7 @@ class CTSCatalog(models.Model):
     """
 
     urn = models.CharField(max_length=255, unique=True)
-    citation_scheme = JSONField(encoder="", default=list, blank=True, null=True)
+    citation_scheme = JSONField(default=list, blank=True, null=True)
     group_name = models.CharField(max_length=255, blank=True, null=True)
     work_title = models.CharField(max_length=255, blank=True, null=True)
     version_label = models.CharField(max_length=255, blank=True, null=True)

@@ -1,5 +1,6 @@
 import abc
 import copy
+from functools import cache
 
 from .models import (
     Book,
@@ -13,10 +14,18 @@ from .models import (
 )
 
 
+MEMOIZED_BY_URN = {}
+
+
 class AbstractFactory(abc.ABC):
     def get(self, **kwargs):
-        instance, created = self.model.objects.get_or_create(**kwargs)
-        return instance, created
+        key = kwargs["urn"]
+        instance = MEMOIZED_BY_URN.get(key)
+        if instance:
+            return instance, False
+        instance = self.model.objects.create(**kwargs)
+        MEMOIZED_BY_URN[key] = instance
+        return instance, True
 
 
 class CITECollectionFactory(AbstractFactory):
@@ -65,9 +74,15 @@ class IndexedAbstractFactory(abc.ABC):
     position = 1
 
     def get(self, urn, **kwargs):
-        instance, created = self.model.objects.get_or_create(
+        key = urn
+        instance = MEMOIZED_BY_URN.get(key)
+        if instance:
+            return instance
+
+        instance = self.model.objects.create(
             urn=urn, **{"idx": self.idx, "position": self.position, **kwargs}
         )
+        MEMOIZED_BY_URN[key] = instance
         self.idx += 1
         self.position += 1
         return instance

@@ -1,11 +1,15 @@
 from posixpath import join as urljoin
 from urllib.parse import quote_plus, unquote
 
+# FIXME: iiif3 is a different service
+# IIIF_SUFFIX = "3"
+IIIF_SUFFIX = ""
+
 
 class IIIFResolver:
     BASE_URL = "https://image.library.jhu.edu/iiif/"
     # @@@ figure out what this actually is in IIIF spec terms
-    CANVAS_BASE_URL = "https://rosetest.library.jhu.edu/rosademo/iiif3/"
+    CANVAS_BASE_URL = f"https://rosetest.library.jhu.edu/rosademo/iiif{IIIF_SUFFIX}/"
     COLLETION_SUBDIR = "homer/VA"
     iruri_kwargs = {
         "region": "full",

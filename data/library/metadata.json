@@ -1,12 +1,12 @@
 {
   "libraries": [
     {
-      "urn": "urn:cite2:hmt:publications.cex.2018e",
-      "content_path": "hmt-2018e.cex",
+        "urn": "urn:cite2:hmt:publications.cex.2020h",
+        "content_path": "hmt-2020h.cex",
       "metadata": {
         "cex_version": "3.0.1",
-        "library_urn": "urn:cite2:hmt:publications.cex.2018e:all",
-        "library_title": "Homer Multitext project, release 2018 E",
+          "library_urn": "urn:cite2:hmt:publications.cex.2020h:all",
+        "library_title": "Homer Multitext project, release 2020h",
         "license": "Creative Commons Attribution, Non-Commercial 4.0 License <https://creativecommons.org/licenses/by-nc/4.0/>",
         "type": "library",
         "namespaces": {

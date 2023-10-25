@@ -1,10 +1,12 @@
 import json
 import os
 import sys
+from functools import cache
 
 from django.conf import settings
 
 import case_conversion
+import tqdm
 
 from . import constants, factories
 from .models import CITELibrary, Line, Section
@@ -50,19 +52,45 @@ class Visitor:
     def get_urn_position(self, field, urn, obj_kwargs):
         return next(idx for idx, item in enumerate(obj_kwargs[field]) if item == urn)
 
+    @cache
     def get_urn_permutation(self, urn):
-        return next(
-            key for key in self.index.keys() if isinstance(key, str) and urn in key
-        )
+        lemma_urn = f"{urn}.lemma"
+        permutation = self.index.get(lemma_urn)
+        if permutation is None:
+            comment_urn = f"{urn}.comment"
+            permutation = self.index.get(comment_urn)
+        # FIXME: These are two regressions from our previous approach
+        # urn:cts:greekLit:tlg5026.msAim.hmt:18.74#urn:cite2:cite:verbs.v1:commentsOn#urn:cts:greekLit:tlg0012.tlg001.msA:18.604_605
+        # urn:cts:greekLit:tlg0012.tlg001.msA-folios:250v.18.604_605
+        # urn:cts:greekLit:tlg5026.msA.hmt:9.667#urn:cite2:cite:verbs.v1:commentsOn#urn:cts:greekLit:tlg0012.tlg001.msA:9
+        # urn:cts:greekLit:tlg0012.tlg001.msA-folios:125v.9.1.comment
+
+        # 2023k
+        # urn:cts:greekLit:tlg5026.msAim.hmt:18.74|urn:cts:greekLit:tlg0012.tlg001.msA:18.604_605
+        # urn:cts:greekLit:tlg5026.msA.hmt:9.667|urn:cts:greekLit:tlg0012.tlg001.msA:9
+
+        return permutation
 
     def get_node_data(self, urn, obj_kwargs):
         try:
             return self.index[urn]
         except KeyError:
-            try:
-                return self.index[self.get_urn_permutation(urn)]
-            except StopIteration:
-                return None
+            return self.get_urn_permutation(urn)
+
+    @cache
+    def expand_book_lines(self, book, field):
+        # We need to do some massaging here in case the object doesn't refer to
+        # either a single line or a range of line but an entire 'book'.
+        # Because, whatever those values might be they cannot be extracted from
+        # the URN itself and we need to build them from the index.
+        line_re = r":" + re.escape(book) + r".[0-9]+"
+        for urn in self.index.keys():
+            # Relation rows are keyed over their S-V-O triple (as a tuple) so
+            # we can skip those immediately.
+            if isinstance(urn, tuple):
+                continue
+            if re.search(line_re, urn):
+                yield field, urn
 
     def resolve_line(self, book_urn, **obj_kwargs):
         joins = {
@@ -167,7 +195,8 @@ class Visitor:
         return False
 
     def apply(self):
-        for key in self.keys:
+        print("Visitor.apply")
+        for key in tqdm.tqdm(self.keys):
             data = self.index[key]
             if isinstance(data, tuple):
                 self.resolve_node(key, data)
@@ -334,6 +363,10 @@ class Parser:
 
     def handle_citedata(self, line, **data):
         urns = [item for item in self.split_line(line) if "urn:" in item]
+
+        if not urns:
+            return
+
         collection_urn = next(
             self.get_urn_root(urn)
             for urn in urns
@@ -365,7 +398,11 @@ class Parser:
             "urn:cts:greekLit:tlg0012.tlg001.msA:18.603-18.604_605": "urn:cts:greekLit:tlg0012.tlg001.msA:18.604-18.605",
         }
         split = self.split_line(line)
-        subject_urn, verb_urn, object_urn = self.split_line(line)
+        try:
+            subject_urn, verb_urn, object_urn = self.split_line(line)
+        except:
+            import ipdb; ipdb.set_trace();
+            raise
 
         if object_urn in transform:
             object_urn = transform[object_urn]
@@ -439,7 +476,8 @@ class Parser:
         }[self.current_block]
 
     def apply(self):
-        for data in self.yield_data():
+        print("Parser.apply")
+        for data in tqdm.tqdm(self.yield_data()):
             self.handle(**data)
         return self.index
 
