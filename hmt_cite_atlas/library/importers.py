@@ -18,6 +18,12 @@ IGNORE_BLOCKS = ["#!cexversion", "#!citelibrary", "#!imagedata"]
 
 RE_BOOK_RANGE = re.compile(r":[0-9]*$")
 
+NODE_STRATEGY_NONE = 1
+NODE_STRATEGY_ITER_KEYS = 2
+NODE_STRATEGY_DSE = 3
+NODE_STRATEGY = NODE_STRATEGY_DSE
+
+
 
 def log(*objs):
     print(*objs, file=sys.stderr, sep="\n")
@@ -59,10 +65,22 @@ class Visitor:
         try:
             return self.index[urn]
         except KeyError:
-            try:
-                return self.index[self.get_urn_permutation(urn)]
-            except StopIteration:
+            if NODE_STRATEGY == NODE_STRATEGY_NONE:
                 return None
+            elif NODE_STRATEGY == NODE_STRATEGY_ITER_KEYS:
+                try:
+                    return self.index[self.get_urn_permutation(urn)]
+                except StopIteration:
+                    return None
+            elif NODE_STRATEGY == NODE_STRATEGY_DSE:
+                lemma_urn = f"{urn}.lemma"
+                permutation = self.index.get(lemma_urn)
+                if permutation is None:
+                    comment_urn = f"{urn}.comment"
+                    permutation = self.index.get(comment_urn)
+                if not permutation:
+                    print(f"\t{urn}")
+                return permutation
 
     def expand_book_lines(self, book, field):
         # We need to do some massaging here in case the object doesn't refer to
