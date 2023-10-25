@@ -74,9 +74,15 @@ class IndexedAbstractFactory(abc.ABC):
     position = 1
 
     def get(self, urn, **kwargs):
-        instance, created = self.model.objects.get_or_create(
+        key = urn
+        instance = MEMOIZED_BY_URN.get(key)
+        if instance:
+            return instance
+
+        instance = self.model.objects.create(
             urn=urn, **{"idx": self.idx, "position": self.position, **kwargs}
         )
+        MEMOIZED_BY_URN[key] = instance
         self.idx += 1
         self.position += 1
         return instance
