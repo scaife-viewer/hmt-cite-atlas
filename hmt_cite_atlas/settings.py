@@ -133,6 +133,7 @@ INSTALLED_APPS = [
     # Project
     "hmt_cite_atlas",
     "hmt_cite_atlas.library",
+    "hmt_cite_atlas.web_annotation",
 ]
 
 if DEBUG:
@@ -176,3 +177,6 @@ GRAPHENE = {
     "SCHEMA": "hmt_cite_atlas.schema.schema",
     "RELAY_CONNECTION_MAX_LIMIT": None,
 }
+
+DEFAULT_HTTP_CACHE_DURATION = 60 * 60 * 24 * 365  # one year
+DEFAULT_HTTP_PROTOCOL = os.environ.get("DEFAULT_HTTP_PROTOCOL", "http")

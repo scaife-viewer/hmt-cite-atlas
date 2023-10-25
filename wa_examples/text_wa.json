@@ -1,0 +1,32 @@
+{
+  "id": "/wa/translation-alignment/QWxpZ25tZW50Q2h1bmtOb2RlOjE=",
+  "type": "Annotation",
+  "target": [
+    "urn:cts:greekLit:tlg0012.tlg001.msA:1.1-1.7",
+    {
+      "type": "SpecificResource",
+      "source": {
+        "id": "https://rosetest.library.jhu.edu/rosademo/iiif/homer/VA/VA012RN-0013/canvas",
+        "type": "Canvas"
+      },
+      "selector": {
+        "type": "ImageApiSelector",
+        "region": "pct:6.11,22.52,46.75,15.01"
+      }
+    }
+  ],
+  "body": [
+    {
+      "type": "TextualBody",
+      "value": "1.1) μῆνιν ἄειδε θεὰ Πηληϊάδεω Ἀχιλῆος\n1.2) οὐλομένην, ἣ μυρί᾽ Ἀχαιοῖς ἄλγε᾽ ἔθηκε,\n1.3) πολλὰς δ᾽ ἰφθίμους ψυχὰς Ἄϊδι προΐαψεν\n1.4) ἡρώων, αὐτοὺς δὲ ἑλώρια τεῦχε κύνεσσιν\n1.5) οἰωνοῖσί τε πᾶσι, Διὸς δ᾽ ἐτελείετο βουλή,\n1.6) ἐξ οὗ δὴ τὰ πρῶτα διαστήτην ἐρίσαντε\n1.7) Ἀτρεΐδης τε ἄναξ ἀνδρῶν καὶ δῖος Ἀχιλλεύς.",
+      "format": "text/plain",
+      "language": "el"
+    },
+    {
+      "type": "TextualBody",
+      "value": "1.1-1.7) The wrath sing, goddess, of Peleus' son, Achilles, that destructive wrath which brought countless woes upon the Achaeans, and sent forth to Hades many valiant souls of heroes, and made them themselves spoil for dogs and every bird; thus the plan of Zeus came to fulfillment, from the time when 1 first they parted in strife Atreus' son, king of men, and brilliant Achilles.",
+      "format": "text/plain",
+      "language": "en"
+    }
+  ]
+}
