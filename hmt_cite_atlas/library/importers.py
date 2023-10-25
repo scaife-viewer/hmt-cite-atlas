@@ -1,6 +1,5 @@
 import json
 import os
-import re
 import sys
 from functools import cache
 
@@ -9,15 +8,14 @@ from django.conf import settings
 import case_conversion
 import tqdm
 
-from . import constants, factories, models
+from . import constants, factories
+from .models import CITELibrary, Line, Section
 
 
 LIBRARY_DATA_PATH = os.path.join(settings.PROJECT_ROOT, "data", "library")
 LIBRARY_METADATA_PATH = os.path.join(LIBRARY_DATA_PATH, "metadata.json")
 
 IGNORE_BLOCKS = ["#!cexversion", "#!citelibrary", "#!imagedata"]
-
-RE_BOOK_RANGE = re.compile(r":[0-9]*$")
 
 
 def log(*objs):
@@ -33,7 +31,10 @@ class Visitor:
             "#!citeproperties": factories.CITEPropertyFactory(),
             "#!citedata": factories.CITEDatumFactory(),
             "#!ctscatalog": factories.CTSCatalogFactory(),
-            "#!ctsdata": factories.CTSDatumFactory(),
+            "#!ctsdata": {
+                "book": factories.BookFactory(),
+                "scholion": factories.ScholionFactory()
+            },
             "#!datamodels": factories.DatamodelFactory(),
             "#!relations": factories.RelationFactory(),
             "#!imagedata": None,
@@ -91,21 +92,57 @@ class Visitor:
             if re.search(line_re, urn):
                 yield field, urn
 
-    def filter_urn_nodes(self, obj_kwargs):
-        for field, value in obj_kwargs.items():
-            if field != "urn" and not self.is_urn(field):
-                if isinstance(value, list):
-                    for item in value:
-                        if self.is_urn(item):
-                            book_range = re.search(RE_BOOK_RANGE, item)
-                            if book_range:
-                                book = book_range.group()[1:]
-                                yield from self.expand_book_lines(book, field)
-                            else:
-                                yield field, item
+    def resolve_line(self, book_urn, **obj_kwargs):
+        joins = {
+            "citelibrary": obj_kwargs.pop("citelibrary"),
+            "ctscatalog": obj_kwargs.pop("ctscatalog")
+        }
 
-                elif self.is_urn(value):
-                    yield field, value
+        book_obj = self.index.get(book_urn)
+        if book_obj is None:
+            factory = self.factory_lookup["#!ctsdata"]["book"]
+            book_obj = factory.get(urn=book_urn, **joins)
+            self.index[book_urn] = book_obj
+            self.visited += 1
+        joins.update({"book": book_obj})
+
+        return Line.objects.get_or_create(**obj_kwargs, **joins)
+
+    def resolve_section(self, book_urn, scholion_urn, **obj_kwargs):
+        joins = {
+            "citelibrary": obj_kwargs.pop("citelibrary"),
+            "ctscatalog": obj_kwargs.pop("ctscatalog")
+        }
+
+        book_obj = self.index.get(book_urn)
+        if book_obj is None:
+            factory = self.factory_lookup["#!ctsdata"]["book"]
+            book_obj = factory.get(urn=book_urn, **joins)
+            self.index[book_urn] = book_obj
+            self.visited += 1
+        joins.update({"book": book_obj})
+
+        scholion_obj = self.index.get(scholion_urn)
+        if scholion_obj is None:
+            factory = self.factory_lookup["#!ctsdata"]["scholion"]
+            scholion_obj = factory.get(urn=scholion_urn, **joins)
+            self.index[scholion_urn] = scholion_obj
+            self.visited += 1
+        joins.update({"scholion": scholion_obj})
+
+        return Section.objects.get_or_create(**obj_kwargs, **joins)
+
+    def resolve_hierarchy(self, obj_kwargs):
+        stem, components = obj_kwargs["urn"].rsplit(":", maxsplit=1)
+        split = components.split(".")
+        try:
+            book, _ = split
+        except ValueError:
+            book, scholion, _ = split
+            return self.resolve_section(
+                f"{stem}:{book}", f"{stem}:{book}.{scholion}", **obj_kwargs
+            )
+        return self.resolve_line(f"{stem}:{book}", **obj_kwargs)
 
     def resolve_related_node(self, urn, field, data, obj_kwargs):
         if isinstance(data, tuple):
@@ -114,22 +151,20 @@ class Visitor:
                 return
 
         if isinstance(obj_kwargs[field], list):
-            # We need to account for whether the list was pre-existing in its
-            # entirety or if we are building it up dynamically as a book range.
-            # In the first case, we can cleanly insert objects by their index.
-            try:
-                idx = self.get_urn_position(field, urn, obj_kwargs)
-                obj_kwargs[field][idx] = data
-            except StopIteration:
-                # Book ranges will only ever have one value in them as we
-                # didn't do any prior destructuring during the parse-stage.
-                # So let's eliminate that value here first before accumulating
-                # the objects in order.
-                if isinstance(obj_kwargs[field][0], str):
-                    obj_kwargs[field] = []
-                obj_kwargs[field].append(data)
+            idx = self.get_urn_position(field, urn, obj_kwargs)
+            obj_kwargs[field][idx] = data
         else:
             obj_kwargs[field] = data
+
+    def filter_urn_nodes(self, obj_kwargs):
+        for field, value in obj_kwargs.items():
+            if field != "urn" and not self.is_urn(field):
+                if isinstance(value, list):
+                    for item in value:
+                        if self.is_urn(item):
+                            yield field, item
+                elif self.is_urn(value):
+                    yield field, value
 
     def resolve_node(self, key, data):
         block, obj_kwargs = data
@@ -142,7 +177,14 @@ class Visitor:
                 continue
             self.resolve_related_node(urn, field, data, obj_kwargs)
 
-        instance, created = self.factory_lookup[block].get(**obj_kwargs)
+        factory = self.factory_lookup[block]
+        try:
+            instance, created = factory.get(**obj_kwargs)
+        except TypeError:
+            # We're denormalizing.
+            instance, created = self.resolve_hierarchy(obj_kwargs)
+            key = instance.urn
+
         if instance:
             if created:
                 self.visited += 1
@@ -235,7 +277,7 @@ class Parser:
                 block_tag = self.is_block_tag(line)
                 if block_tag:
                     self.current_block = line
-                    line_ref = 0
+                    position = 0
                     continue
 
                 if self.ignore_block():
@@ -247,9 +289,9 @@ class Parser:
                         continue
 
                 if self.current_block == "#!ctsdata":
-                    line_ref += 1
-                    line_idx = line_ref - 1
-                    yield {"line_idx": line_idx, "line_ref": line_ref, "line": line}
+                    position += 1
+                    idx = position - 1
+                    yield {"idx": idx, "position": position, "line": line}
                     continue
 
                 if not self.is_column_definition(line):
@@ -263,13 +305,13 @@ class Parser:
             )
         self.index_obj(obj_kwargs)
 
-    def handle_ctsdata(self, line_idx, line_ref, line, **data):
+    def handle_ctsdata(self, idx, position, line, **data):
         urn, tokens = self.split_line(line)
         obj_kwargs = {
             "urn": urn,
             "text_content": tokens,
-            "position": line_ref,
-            "idx": line_idx,
+            "position": position,
+            "idx": idx,
             "ctscatalog": self.get_urn_root(urn),
             "citelibrary": self.library_obj,
         }
@@ -352,18 +394,15 @@ class Parser:
 
     def handle_relations(self, line, **data):
         transform = {
-            # "urn:cts:greekLit:tlg0012.tlg001.msA:4",
-            # "urn:cts:greekLit:tlg0012.tlg001.msA:8",
-            # "urn:cts:greekLit:tlg0012.tlg001.msA:9",
-            # "urn:cts:greekLit:tlg0012.tlg001.msA:10",
-            # "urn:cts:greekLit:tlg0012.tlg001.msA:11",
-            # "urn:cts:greekLit:tlg0012.tlg001.msA:95",
-            # "urn:cts:greekLit:tlg0012.tlg001.msA:311",
             "urn:cts:greekLit:tlg0012.tlg001.msA:18.604_605": "urn:cts:greekLit:tlg0012.tlg001.msA:18.603-18.604",
             "urn:cts:greekLit:tlg0012.tlg001.msA:18.603-18.604_605": "urn:cts:greekLit:tlg0012.tlg001.msA:18.604-18.605",
         }
         split = self.split_line(line)
-        subject_urn, verb_urn, object_urn = self.split_line(line)
+        try:
+            subject_urn, verb_urn, object_urn = self.split_line(line)
+        except:
+            import ipdb; ipdb.set_trace();
+            raise
 
         if object_urn in transform:
             object_urn = transform[object_urn]
@@ -371,7 +410,7 @@ class Parser:
         # Verbs are usually defined in themselves as citedata nodes but that's
         # not the case for urn:cite2:hmt:verbs.v1:appearsIn. I think it is
         # supposed to be: urn:cite2:cite:verbs.v1:appearsIn, which is defined
-        # but never used at all. So let's work around that.
+        # in the source but never used at all. So let's work around that.
         if verb_urn == "urn:cite2:hmt:verbs.v1:appearsIn":
             verb_urn = "urn:cite2:cite:verbs.v1:appearsIn"
 
@@ -445,7 +484,7 @@ class Parser:
 
 def _import_library(data):
     full_content_path = os.path.join(LIBRARY_DATA_PATH, data["content_path"])
-    library_obj, _ = models.CITELibrary.objects.update_or_create(
+    library_obj, _ = CITELibrary.objects.update_or_create(
         urn=data["urn"],
         defaults=dict(
             name=data["metadata"]["library_title"], metadata=data["metadata"]
@@ -464,7 +503,7 @@ def _import_library(data):
 
 def import_libraries(reset=True):
     if reset:
-        models.CITELibrary.objects.all().delete()
+        CITELibrary.objects.all().delete()
 
     library_metadata = json.load(open(LIBRARY_METADATA_PATH))
     for library_data in library_metadata["libraries"]:
