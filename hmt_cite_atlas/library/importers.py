@@ -15,7 +15,7 @@ from .models import CITELibrary, Line, Section
 LIBRARY_DATA_PATH = os.path.join(settings.PROJECT_ROOT, "data", "library")
 LIBRARY_METADATA_PATH = os.path.join(LIBRARY_DATA_PATH, "metadata.json")
 
-IGNORE_BLOCKS = ["#!cexversion", "#!citelibrary", "#!imagedata"]
+IGNORE_BLOCKS = ["#!cexversion", "#!citelibrary", "#!imagedata", "#!citerelationset"]
 
 
 def log(*objs):
@@ -38,6 +38,7 @@ class Visitor:
             "#!datamodels": factories.DatamodelFactory(),
             "#!relations": factories.RelationFactory(),
             "#!imagedata": None,
+            "#!citerelationset": None,
         }
         self.visited = 0
         self.problems = []
@@ -299,10 +300,14 @@ class Parser:
 
     def handle_ctscatalog(self, line, **data):
         obj_kwargs = self.destructure_line(line)
-        if obj_kwargs["citation_scheme"] is not None:
-            obj_kwargs.update(
-                {"citation_scheme": obj_kwargs["citation_scheme"].split(",")}
-            )
+        try:
+            if obj_kwargs["citation_scheme"] is not None:
+                obj_kwargs.update(
+                    {"citation_scheme": obj_kwargs["citation_scheme"].split(",")}
+                )
+        except:
+            import ipdb; ipdb.set_trace();
+            raise
         self.index_obj(obj_kwargs)
 
     def handle_ctsdata(self, idx, position, line, **data):
@@ -327,10 +332,18 @@ class Parser:
         self.index_obj(obj_kwargs)
 
     def handle_citeproperties(self, line, **data):
+        # expected
+        # Property|Label|Type|Authority list
+        # received
+        # URN|Label|Type|Authority list
         obj_kwargs = self.destructure_line(line)
         urn = obj_kwargs.pop("property")
-
-        collection_urn, column = urn.rsplit(".", maxsplit=1)
+        try:
+            collection_urn, column = urn.rsplit(".", maxsplit=1)
+        except:
+            if line.startswith('URN'):
+                return
+            raise
         collection_urn = f"{collection_urn}:"
         column = column.rstrip(":")
 
@@ -459,7 +472,7 @@ class Parser:
         }
         self.index_obj(key=tuple(split), obj_kwargs=obj_kwargs)
 
-    def handle_imagedata(self, line, **data):
+    def handle_not_implemented(self, line, **data):
         raise NotImplementedError()
 
     @property
@@ -471,8 +484,9 @@ class Parser:
             "#!citeproperties": self.handle_citeproperties,
             "#!citedata": self.handle_citedata,
             "#!datamodels": self.handle_datamodels,
-            "#!imagedata": self.handle_imagedata,
+            "#!imagedata": self.handle_not_implemented,
             "#!relations": self.handle_relations,
+            "#!citerelationset": self.handle_not_implemented,
         }[self.current_block]
 
     def apply(self):
